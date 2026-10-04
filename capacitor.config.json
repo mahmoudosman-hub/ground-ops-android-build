@@ -1,0 +1,7 @@
+{
+  "appId": "com.groundops.tracker",
+  "appName": "Ground OPS Tracker",
+  "webDir": "frontend",
+  "server": { "androidScheme": "https", "cleartext": false },
+  "android": { "allowMixedContent": false, "webContentsDebuggingEnabled": false, "backgroundColor": "#0f4c81" }
+}
