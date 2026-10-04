@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Ground OPS Tracker</string>
+    <string name="title_activity_main">Ground OPS Tracker</string>
+    <string name="package_name">com.groundops.tracker</string>
+    <string name="custom_url_scheme">com.groundops.tracker</string>
+</resources>
