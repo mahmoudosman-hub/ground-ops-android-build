@@ -125,18 +125,22 @@ jobs:
           apk="dist/${APK_NAME}.apk"; fail=0; rows=""
           check() { if eval "$2"; then rows+="| ✅ | $1 |"$'\n'; else rows+="| ❌ | $1 |"$'\n'; fail=1; fi; }
           AA="$(command -v apkanalyzer || find "$ANDROID_HOME" -name apkanalyzer -type f | head -1)"
+          AAPT2="$(find "$ANDROID_HOME/build-tools" -name aapt2 -type f | sort | tail -1)"
           manifest="$("$AA" manifest print "$apk" 2>/dev/null)"
-          classes="$("$AA" dex packages --defined-only "$apk" 2>/dev/null)"
+          xmltree="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$apk" 2>/dev/null)"
           dexall() { unzip -p "$apk" 'classes*.dex' | grep -a -c "$1"; }
-          check "Foreground service declared with type location" 'echo "$manifest" | grep -q "LocationForegroundService" && echo "$manifest" | grep -q "foregroundServiceType=\"location\""'
+          # Diagnostics (visible in the job log) so a mismatch can be understood, not guessed.
+          echo "::group::manifest: service entry"; echo "$manifest" | grep -B1 -A6 "LocationForegroundService" | head -20; echo "$xmltree" | grep -i "foregroundServiceType" | head -5; echo "::endgroup::"
+          echo "::group::dex: tracker class descriptors found"; unzip -p "$apk" 'classes*.dex' | grep -a -o 'Lcom/groundops/tracker/[A-Za-z0-9_/$]*;' | sort -u | head -40; echo "::endgroup::"
+          check "Foreground service declared with type location" '{ echo "$manifest" | grep -q "LocationForegroundService" || echo "$xmltree" | grep -q "LocationForegroundService"; } && { echo "$manifest" | grep -Eq "foregroundServiceType=\"(location|0x8)\"" || echo "$xmltree" | grep "foregroundServiceType" | grep -Eq "0x8|location"; }'
           check "Permissions: FOREGROUND_SERVICE_LOCATION, POST_NOTIFICATIONS, location, camera" 'for p in FOREGROUND_SERVICE_LOCATION POST_NOTIFICATIONS ACCESS_FINE_LOCATION CAMERA; do echo "$manifest" | grep -q "android.permission.$p" || exit 1; done'
           check "No ACCESS_BACKGROUND_LOCATION (not needed, deliberately not requested)" '! echo "$manifest" | grep -q ACCESS_BACKGROUND_LOCATION'
           check "Backups disabled (allowBackup=false) and HTTPS only" 'echo "$manifest" | grep -q "allowBackup=\"false\"" && echo "$manifest" | grep -q "usesCleartextTraffic=\"false\""'
-          check "Class LocationForegroundService (foreground location service)" 'echo "$classes" | grep -q "LocationForegroundService"'
-          check "Class GopsLocationPlugin (bridge to the web app)" 'echo "$classes" | grep -q "GopsLocationPlugin"'
-          check "Class TrackingCore (queue filter, ordered sync, duplicate protection, stop rules)" 'echo "$classes" | grep -q "TrackingCore"'
-          check "Class SqlitePointStore (durable local queue)" 'echo "$classes" | grep -q "SqlitePointStore"'
-          check "Class HttpTransport (uploads to the backend)" 'echo "$classes" | grep -q "HttpTransport"'
+          check "Class LocationForegroundService (foreground location service)" '[ "$(dexall "Lcom/groundops/tracker/LocationForegroundService;")" -gt 0 ]'
+          check "Class GopsLocationPlugin (bridge to the web app)" '[ "$(dexall "Lcom/groundops/tracker/GopsLocationPlugin;")" -gt 0 ]'
+          check "Class TrackingCore (queue filter, ordered sync, duplicate protection, stop rules)" '[ "$(dexall "Lcom/groundops/tracker/core/TrackingCore;")" -gt 0 ]'
+          check "Class SqlitePointStore (durable local queue)" '[ "$(dexall "Lcom/groundops/tracker/SqlitePointStore;")" -gt 0 ]'
+          check "Class HttpTransport (uploads to the backend)" '[ "$(dexall "Lcom/groundops/tracker/core/HttpTransport;")" -gt 0 ]'
           check "Mock-location detection compiled in (isMock / isFromMockProvider)" '[ "$(dexall isFromMockProvider)" -gt 0 ] && [ "$(dexall isMock)" -gt 0 ]'
           check "Network-recovery callback compiled in (registerNetworkCallback)" '[ "$(dexall registerNetworkCallback)" -gt 0 ]'
           check "Web app packaged (index.html, service worker, config.js)" 'unzip -l "$apk" | grep -q "assets/public/index.html" && unzip -l "$apk" | grep -q "assets/public/service-worker.js" && unzip -l "$apk" | grep -q "assets/public/config.js"'
