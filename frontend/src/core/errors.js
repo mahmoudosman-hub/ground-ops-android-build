@@ -1,0 +1,20 @@
+import { t } from './i18n.js';
+const MAP = {
+  OFFLINE: 'You are offline. Connect to the internet and try again.', NETWORK_ERROR: 'Cannot reach the server. Check your connection and try again.',
+  SERVER_UNAVAILABLE: 'The server is not responding correctly. Please try again shortly.', NOT_CONFIGURED: 'The app is not configured yet (API_URL missing in config.js).',
+  INVALID_CREDENTIALS: 'Wrong ID or password.', ACCOUNT_LOCKED: 'Too many failed attempts. Try again in a few minutes.', ACCOUNT_INACTIVE: 'This account is inactive. Contact your administrator.',
+  INVALID_SESSION: 'Your session has ended. Please sign in again.', SESSION_EXPIRED: 'Your session has expired. Please sign in again.', RATE_LIMITED: 'Too many requests. Wait a minute and try again.',
+  PASSWORD_CHANGE_REQUIRED: 'You must change your password first.', WEAK_PASSWORD: 'Password is too weak.', FORBIDDEN: 'You do not have permission to do this.',
+  LAST_ADMIN: 'This is the last active administrator. Create or activate another one first.', GPS_UNAVAILABLE: 'Location is not available. Turn on GPS and allow location access.',
+  LOW_ACCURACY: 'GPS accuracy is too low. Move to an open area and retry.', STALE_LOCATION: 'The GPS fix is too old. Please try again.', OUTSIDE_GEOFENCE: 'You are outside the assigned branch.',
+  DUPLICATE_CHECKIN: 'You have already checked in for this shift.', ALREADY_CHECKED_OUT: 'You have already checked out.', NOT_CHECKED_IN: 'You have not checked in.',
+  NO_ASSIGNMENT: 'You have no shift assigned for today.', CHECKIN_WINDOW_CLOSED: 'Check-in is not open right now.', ON_LEAVE: 'You are on leave for this date.',
+  SELFIE_REQUIRED: 'A selfie is required to check in.', INVALID_IMAGE: 'The selfie could not be used. Take it again.', IMAGE_TOO_LARGE: 'The selfie is too large. Take it again.',
+  NO_ACTIVE_SHIFT: 'There is no active shift.', SERVER_BUSY: 'The server is busy. Try again in a moment.', ALREADY_EXISTS: 'This already exists.', NOT_FOUND: 'Not found.',
+  BRANCH_IN_USE: 'This branch still has current or future assignments.', ASSIGNMENT_LOCKED: 'This assignment can no longer be changed (attendance exists).', EXPORT_TOO_LARGE: 'Too many rows to export. Narrow the date range or add filters.'
+};
+export function errorMessage(e) {
+  if (!e) return t('Something went wrong.');
+  if (e.code === 'VALIDATION_ERROR' || e.code === 'INVALID_ASSIGNMENT' || e.code === 'WEAK_PASSWORD') return e.message || t('Invalid input.');
+  return MAP[e.code] ? t(MAP[e.code]) : (e.message || t('Something went wrong.'));
+}
