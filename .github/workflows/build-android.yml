@@ -121,7 +121,8 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          set -u   # no pipefail on purpose: 'grep -q' closing a pipe early must not turn a match into a failure
+          set -u
+          set +o pipefail   # GitHub starts bash with pipefail ON: 'echo big | grep -q x' then reports a false failure (SIGPIPE). It must be OFF here.
           apk="dist/${APK_NAME}.apk"; fail=0; rows=""
           check() { if eval "$2"; then rows+="| ✅ | $1 |"$'\n'; else rows+="| ❌ | $1 |"$'\n'; fail=1; fi; }
           AA="$(command -v apkanalyzer || find "$ANDROID_HOME" -name apkanalyzer -type f | head -1)"
