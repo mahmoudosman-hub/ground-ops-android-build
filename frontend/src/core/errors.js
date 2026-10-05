@@ -11,11 +11,12 @@ const MAP = {
   NO_ASSIGNMENT: 'You have no shift assigned for today.', CHECKIN_WINDOW_CLOSED: 'Check-in is not open right now.', ON_LEAVE: 'You are on leave for this date.',
   SELFIE_REQUIRED: 'A selfie is required to check in.', INVALID_IMAGE: 'The selfie could not be used. Take it again.', IMAGE_TOO_LARGE: 'The selfie is too large. Take it again.',
   NO_ACTIVE_SHIFT: 'There is no active shift.', SERVER_BUSY: 'The server is busy. Try again in a moment.', ALREADY_EXISTS: 'This already exists.', NOT_FOUND: 'Not found.',
+  REQUEST_CONFLICT: 'This request is no longer possible because the schedule changed.', REQUEST_TOO_LATE: 'It is too late for this request.', LEAVE_BALANCE_EXCEEDED: 'Not enough annual leave balance.', LEAVE_WEEK_LIMIT: 'Too many leave days in one week.', FILE_REQUIRED: 'Attach at least one proof file.', TOO_MANY_FILES: 'Too many files.', INVALID_FILE: 'This file cannot be used.',
   ALREADY_ON_BREAK: 'You are already on a break.', NOT_ON_BREAK: 'You are not on a break.', BREAK_ALLOWANCE_USED: 'You have used all your break time for this shift.', MOCK_LOCATION_REJECTED: 'A fake location was detected.',
   BRANCH_IN_USE: 'This branch still has current or future assignments.', ASSIGNMENT_LOCKED: 'This assignment can no longer be changed (attendance exists).', EXPORT_TOO_LARGE: 'Too many rows to export. Narrow the date range or add filters.'
 };
 export function errorMessage(e) {
   if (!e) return t('Something went wrong.');
-  if (e.code === 'VALIDATION_ERROR' || e.code === 'INVALID_ASSIGNMENT' || e.code === 'WEAK_PASSWORD') return e.message || t('Invalid input.');
+  if (['VALIDATION_ERROR', 'INVALID_ASSIGNMENT', 'WEAK_PASSWORD', 'REQUEST_CONFLICT', 'REQUEST_TOO_LATE', 'LEAVE_BALANCE_EXCEEDED', 'LEAVE_WEEK_LIMIT', 'FILE_REQUIRED', 'TOO_MANY_FILES', 'INVALID_FILE'].includes(e.code)) return e.message || t('Invalid input.'); // the server message is specific (dates, counts) and already clear
   return MAP[e.code] ? t(MAP[e.code]) : (e.message || t('Something went wrong.'));
 }

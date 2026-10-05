@@ -9,11 +9,12 @@ import { createQueue } from '../../services/offline-queue.js';
 import { onInstallChange, canInstall, promptInstall, isStandalone, isIos } from '../../services/pwa.js';
 import { createHome } from './home.js';
 import { createNotificationBell } from '../../components/notifications.js';
+import { createScheduleView, createRequestsView } from './requests.js';
 
 export function mountEmployeeApp(root, deps = {}) {
   initLang();
   const api = deps.api || createApi('employee'), provider = deps.provider || selectProvider(), queue = deps.queue || createQueue();
-  let home = null, notice = null, bell = null;
+  let home = null, notice = null, bell = null, sched = null, reqs = null;
   const online = () => !(globalThis.navigator && globalThis.navigator.onLine === false);
   const netBadge = h('span', { id: 'net-badge' });
   const updateNet = () => mount(netBadge, badge(online() ? 'ONLINE' : 'OFFLINE'));
@@ -55,7 +56,11 @@ export function mountEmployeeApp(root, deps = {}) {
     if (!s) return loginView();
     if (!s.user.must_change_password) { bell = createNotificationBell({ api }); mount(headerRight, bell.el, h('span', { class: 'who' }, s.user.name), logoutBtn()); } else mount(headerRight, h('span', { class: 'who' }, s.user.name), logoutBtn());
     if (s.user.must_change_password) return changePasswordView();
-    home = createHome({ api, provider, queue }); mount(body, home.el);
+    home = createHome({ api, provider, queue }); sched = createScheduleView({ api }); reqs = createRequestsView({ api, onChange: () => { if (home) home.refresh(); } });
+    const boxes = { home: h('div', { id: 'view-home' }, home.el), schedule: h('div', { id: 'view-schedule', hidden: true }, sched.el), requests: h('div', { id: 'view-requests', hidden: true }, reqs.el) };
+    const tabs = [['home', 'Home'], ['schedule', 'My schedule'], ['requests', 'Requests']].map(([k, label]) => button(t(label), { id: `tab-${k}`, small: true, on: { click: () => show(k) } }));
+    function show(k) { Object.keys(boxes).forEach((n) => { boxes[n].hidden = n !== k; }); tabs.forEach((b, i) => { const on = ['home', 'schedule', 'requests'][i] === k; b.classList.toggle('active', on); b.setAttribute('aria-current', on ? 'page' : 'false'); }); if (k === 'schedule') sched.refresh(); if (k === 'requests') reqs.refresh(); else if (k === 'home' && home) home.refresh(); }
+    mount(body, h('nav', { class: 'tabs', id: 'tabs', 'aria-label': t('Sections') }, ...tabs), boxes.home, boxes.schedule, boxes.requests); show('home');
   }
   view();
   return { api, view, get home() { return home; } };

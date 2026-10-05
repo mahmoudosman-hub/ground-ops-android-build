@@ -74,6 +74,10 @@ input, select, textarea { font: inherit; min-height: var(--tap); padding: 8px 10
   .admin-shell { grid-template-columns: 240px 1fr; grid-template-areas: "head head" "side main"; } .menu-btn { display: none; } .sidebar { position: sticky; top: 52px; grid-area: side; transform: none !important; width: auto; height: calc(100vh - 52px); padding-top: 12px; z-index: 5; }
   .cards { grid-template-columns: repeat(7, 1fr); }
 }
+/* tabs, schedule and requests */
+.tabs { display: flex; gap: 6px; margin: 0 0 10px; flex-wrap: wrap; } .tabs .btn.active { background: var(--brand, #1565c0); color: #fff; }
+.sched-list, .req-list { list-style: none; padding: 0; margin: 0; } .sched-list li, .req-list li { padding: 8px 0; border-bottom: 1px solid var(--line); } .sched-list li.today { background: rgba(21, 101, 192, .08); } .sched-list .day { display: inline-block; min-width: 7.5em; font-weight: 600; } .req p { margin: .25rem 0; }
+.proof-view img { max-width: 100%; height: auto; }
 /* notification bell + break card */
 .bell { position: relative; } .bell-count { position: absolute; top: 0; inset-inline-end: 0; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #c62828; color: #fff; font-size: .7rem; line-height: 18px; text-align: center; font-weight: 700; }
 .notif-list { list-style: none; padding: 0; margin: 0; } .notif-list li { padding: 8px 0; border-bottom: 1px solid var(--line); } .notif-list li.read { opacity: .65; } .notif-list p { margin: .2rem 0; }

@@ -1,13 +1,17 @@
 import { h, mount } from '../../core/dom.js';
 import { t } from '../../core/i18n.js';
 import { fmtTime, fmtDateTime, todayLocal, addDays, minutesText } from '../../core/time.js';
-import { badge, button, dataTable, spinner, errorBox, emptyState } from '../../components/ui.js';
+import { badge, button, buildForm, openModal, toast, dataTable, spinner, errorBox, emptyState } from '../../components/ui.js';
 import { showSelfie } from './records.js';
 import { createMap, drawBranches, drawPoint, fit } from './map.js';
 import { statusCells, locationCell } from './dashboard.js';
 
 const settle = async (p) => { try { return { ok: await p }; } catch (e) { return { err: e }; } };
 
+function adjustBalance(ctx, id, current, done) {
+  let m; m = openModal({ title: t('Adjust annual leave balance'), body: h('div', {}, h('p', { class: 'hint' }, t('Adds or removes days for the current year only (for example +3 for a new hire, -2 for leave taken before the system). Use a negative number to remove days.')),
+    buildForm([{ name: 'days', label: 'Adjustment (days, -60 to 60)', type: 'number', required: true, min: -60, max: 60, step: 1, value: current || 0 }], {}, { submitLabel: t('Save'), onSubmit: async (v) => { await ctx.api.call('setLeaveAdjustment', { employee_id: id, days: v.days }); m.close(); toast(t('Balance updated'), 'ok'); done(); } }).el) });
+}
 export async function employeeDetailPage(ctx) {
   const id = (ctx.params.id || '').toUpperCase(), date = ctx.params.date || todayLocal();
   if (!id) return { el: errorBox({ message: t('No employee selected.') }) };
@@ -17,6 +21,7 @@ export async function employeeDetailPage(ctx) {
     settle(ctx.api.call('getCurrentStatuses', { date, employee_id: id })), settle(ctx.api.call('getReports', { report: 'late_employees', employee_id: id, date_from: addDays(todayLocal(), -89), date_to: todayLocal(), page_size: 100 })),
     settle(ctx.api.call('getReports', { report: 'absent_employees', employee_id: id, date_from: addDays(todayLocal(), -89), date_to: todayLocal(), page_size: 100 })), settle(ctx.api.call('getLeaves', { employee_id: id, page_size: 100 })), ctx.lookups.load()]);
   if (emp.err) return { el: errorBox(emp.err) };
+  const sch = await settle(ctx.api.call('getEmployeeSchedule', { employee_id: id }));
   const brk = await settle(ctx.api.call('getBreaks', { employee_id: id, date_from: date, date_to: date, page_size: 50 }));
   const sec = (title, node, id2) => h('section', { class: 'card', id: id2 }, h('h2', {}, t(title)), node);
   const guard = (r, render) => (r.err ? h('p', { class: 'hint' }, r.err.code === 'FORBIDDEN' ? t('You do not have permission to view this section.') : errorBox(r.err)) : render(r.ok));
@@ -41,10 +46,13 @@ export async function employeeDetailPage(ctx) {
   const mapBox = h('div', { class: 'map', id: 'detail-map' }); const mapSec = sec('Location map', mapBox, 'detail-map-card');
   const evSec = sec('Geofence events', guard(ev, (x) => (x.items.length ? dataTable({ columns: [{ key: 'timestamp', label: 'Time', render: (r) => fmtTime(r.timestamp) }, { key: 'event_type', label: 'Event', render: (r) => badge(r.event_type) }, { key: 'distance_from_branch_meters', label: 'Distance (m)', render: (r) => Math.round(r.distance_from_branch_meters) }, { key: 'duration_minutes', label: 'Outside', render: (r) => (r.duration_minutes !== null && r.duration_minutes !== '' ? minutesText(r.duration_minutes) : '-') }], rows: x.items }) : emptyState(t('No geofence events.')))));
   const brkSec = sec('Breaks', guard(brk, (x) => (x.items.length ? dataTable({ columns: [{ key: 'started_at', label: 'Start', render: (r) => fmtTime(r.started_at) }, { key: 'ended_at', label: 'End', render: (r) => (r.ended_at ? fmtTime(r.ended_at) : badge('ON_BREAK')) }, { key: 'seconds', label: 'Minutes', render: (r) => (r.ended_at ? Math.round(r.seconds / 60) : '-') }, { key: 'ended_by', label: 'Ended by' }, { key: 'exceeded', label: 'Over allowance', render: (r) => (r.exceeded ? badge('BREAK_EXCEEDED', 'Yes') : 'No') }], rows: x.items }) : emptyState(t('No breaks on this date.')))), 'detail-breaks');
+  const schedSec = sec('Schedule - next 14 days', guard(sch, (x) => h('div', {}, h('p', { class: 'hint', id: 'detail-balance' }, t('Annual leave {y}: {e} per year (adjustment {a}), used {u}, pending {p}, left {r}.', { y: x.balance.year, e: x.balance.entitlement, a: x.balance.adjustment, u: x.balance.used, p: x.balance.pending, r: x.balance.remaining }), ' ',
+    ctx.user.permissions.includes('edit_employees') ? button(t('Adjust balance'), { small: true, id: 'btn-adjust-balance', on: { click: () => adjustBalance(ctx, id, x.balance.adjustment, () => { globalThis.dispatchEvent(new globalThis.HashChangeEvent('hashchange')); }) } }) : null),
+    h('ul', { class: 'sched-list', id: 'detail-schedule' }, x.days.map((d) => h('li', {}, h('span', { class: 'day' }, d.date), ' ', d.assignment ? `${d.assignment.start_time}-${d.assignment.end_time} · ${d.assignment.branch_name}${d.assignment.source === 'REQUEST' ? ' (request)' : ''}` : d.leave ? badge('ON_LEAVE', d.leave.leave_type) : t('Day off')))))), 'detail-schedule-sec');
   const lateSec = sec('Late history (90 days)', guard(late, (x) => (x.rows.length ? dataTable({ columns: [{ key: 'work_date', label: 'Date' }, { key: 'check_in_time', label: 'Check-in', render: (r) => fmtTime(r.check_in_time) }, { key: 'late_minutes', label: 'Late (min)' }], rows: x.rows }) : emptyState(t('No late arrivals.')))), 'detail-late');
   const absSec = sec('Absence history (90 days)', guard(absent, (x) => (x.rows.length ? dataTable({ columns: [{ key: 'work_date', label: 'Date' }, { key: 'shift_name', label: 'Shift' }, { key: 'branch_name', label: 'Branch' }], rows: x.rows }) : emptyState(t('No absences.')))), 'detail-absent');
   const lvSec = sec('Leave history', guard(leaves, (x) => (x.items.length ? dataTable({ columns: [{ key: 'date', label: 'Date' }, { key: 'leave_type', label: 'Type' }, { key: 'status', label: 'Status', render: (r) => badge(r.status) }, { key: 'notes', label: 'Notes' }], rows: x.items }) : emptyState(t('No leave recorded.')))), 'detail-leave');
-  mount(root, h('div', { class: 'detail-head' }, h('a', { href: '#/employees', class: 'btn btn-small' }, '← ' + t('Employees')), h('h1', {}, e.employee_name)), datePick, h('div', { class: 'grid-2' }, profile, today), timeline, mapSec, evSec, brkSec, h('div', { class: 'grid-3' }, lateSec, absSec, lvSec));
+  mount(root, h('div', { class: 'detail-head' }, h('a', { href: '#/employees', class: 'btn btn-small' }, '← ' + t('Employees')), h('h1', {}, e.employee_name)), datePick, h('div', { class: 'grid-2' }, profile, today), timeline, mapSec, evSec, brkSec, schedSec, h('div', { class: 'grid-3' }, lateSec, absSec, lvSec));
   createMap(mapBox).then((m) => {
     if (!m) { mapSec.hidden = true; return; }
     const pts = [], br = a && l.branches.find((b) => b.branch_id === a.branch_id); if (br) { drawBranches(m, [{ name: br.branch_name, latitude: br.latitude, longitude: br.longitude, radius: br.geofence_radius_meters }]); pts.push([br.latitude, br.longitude]); }

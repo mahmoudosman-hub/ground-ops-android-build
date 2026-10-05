@@ -12,7 +12,7 @@ const statusLabel = (s) => (s ? s.replace(/_/g, ' ').toLowerCase().replace(/^\w/
 export function statusCells(r) {
   const flags = (r.flags || []).filter((f) => f === 'POSSIBLE_SPOOFING' || f === 'MISSING_CHECKOUT');
   const brk = r.on_break ? badge(r.break_exceeded ? 'BREAK_EXCEEDED' : 'ON_BREAK', `${r.break_exceeded ? 'Break over limit' : 'On break'} ${r.break_used_minutes}/${r.break_allowance_minutes} min`) : null;
-  return h('span', { class: 'badges' }, badge(r.attendance_state), brk, r.punctuality === 'LATE' ? badge('LATE', `Late ${r.late_minutes} min`) : (r.punctuality === 'ON_TIME' ? badge('ON_TIME') : null), flags.map((f) => badge(f)));
+  return h('span', { class: 'badges' }, badge(r.attendance_state), brk, r.sick_pending ? badge('SICK_PENDING') : null, r.punctuality === 'LATE' ? badge('LATE', `Late ${r.late_minutes} min`) : (r.punctuality === 'ON_TIME' ? badge('ON_TIME') : null), flags.map((f) => badge(f)));
 }
 export function locationCell(r) {
   if (!r.location_state) return '-';

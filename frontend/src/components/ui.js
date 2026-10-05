@@ -11,6 +11,7 @@ const BADGES = {
   GPS_DISABLED: ['bad', 'GPS disabled'], UNAVAILABLE: ['muted', 'Tracking unavailable'], TRACKING_UNAVAILABLE: ['warn', 'Tracking unavailable'], STOPPED: ['muted', 'Tracking off'],
   POSSIBLE_SPOOFING: ['bad', 'Possible spoofing'], MISSING_CHECKOUT: ['warn', 'Missing check-out'], LOW_ACCURACY: ['warn', 'Low accuracy'], CHECKOUT_OUTSIDE_GEOFENCE: ['warn', 'Checked out outside branch'],
   CRITICAL: ['bad', 'Critical'], WARN: ['warn', 'Warning'], INFO: ['info', 'Info'],
+  PENDING_PARTNER: ['warn', 'Waiting for colleague'], PENDING_ADMIN: ['warn', 'Waiting for admin'], APPROVED: ['ok', 'Approved'], REJECTED: ['bad', 'Rejected'], REJECTED_BY_PARTNER: ['bad', 'Declined by colleague'], CANCELLED: ['muted', 'Cancelled'], EXPIRED: ['muted', 'Expired'], DRAFT: ['muted', 'Draft'], EARLY_LEAVE_SET: ['info', 'Early leave'], SICK_PENDING: ['warn', 'Sick request pending'],
   ON_BREAK: ['info', 'On break'], BREAK_EXCEEDED: ['bad', 'Break over limit'],
   EXIT_GEOFENCE: ['bad', 'Left branch'], ENTER_GEOFENCE: ['ok', 'Returned'], ONLINE: ['ok', 'Online'], OFFLINE: ['bad', 'Offline']
 };
@@ -49,7 +50,7 @@ export function confirmDialog(message, { okLabel = t('Confirm'), danger = false 
 }
 
 export function button(label, o = {}) {
-  return h('button', { type: o.type || 'button', class: `btn btn-${o.kind || 'default'}${o.big ? ' btn-big' : ''}${o.small ? ' btn-small' : ''}`, disabled: o.disabled, on: o.on, id: o.id, 'aria-label': o.aria }, label);
+  return h('button', { type: o.type || 'button', class: `btn btn-${o.kind || 'default'}${o.big ? ' btn-big' : ''}${o.small ? ' btn-small' : ''}${o.class ? ' ' + o.class : ''}`, disabled: o.disabled, on: o.on, id: o.id, 'aria-label': o.aria }, label);
 }
 export const spinner = (msg) => h('div', { class: 'spinner', role: 'status' }, h('span', { class: 'spin', 'aria-hidden': 'true' }), msg || t('Loading...'));
 export const emptyState = (msg) => h('p', { class: 'empty' }, msg || t('Nothing to show.'));

@@ -19,9 +19,11 @@ import { adminsPage } from './admins.js';
 import { createNotificationBell } from '../../components/notifications.js';
 import { alertsPage } from './alerts.js';
 import { scheduleImportPage } from './schedule-import.js';
+import { requestsPage } from './requests.js';
 
 export const ROUTES = [
   { path: 'dashboard', title: 'Dashboard', perm: 'view_current_status', page: dashboardPage, nav: true }, { path: 'live', title: 'Live Monitoring', perm: 'view_current_status', page: livePage, nav: true },
+  { path: 'requests', title: 'Requests', perm: 'manage_requests', page: requestsPage, nav: true },
   { path: 'alerts', title: 'Alerts', perm: 'view_alerts', page: alertsPage, nav: true },
   { path: 'employees', title: 'Employees', perm: 'view_employees', page: employeesPage, nav: true }, { path: 'employee', title: 'Employee Details', perm: 'view_employees', page: employeeDetailPage },
   { path: 'branches', title: 'Branches', perm: 'view_branches', page: branchesPage, nav: true }, { path: 'shifts', title: 'Shifts', perm: 'view_shifts', page: shiftsPage, nav: true },
