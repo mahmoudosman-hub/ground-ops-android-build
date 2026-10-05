@@ -12,7 +12,7 @@ export function createNativeProvider(bridge) {
     requestPermission: () => (bridge.requestLocationPermission ? bridge.requestLocationPermission() : bridge.requestPermission()),
     getPosition: (o) => bridge.getPosition(o),
     setKeepAwake: async () => true,
-    startTracking: (cfg) => bridge.startTracking(cfg), stopTracking: () => bridge.stopTracking(), getTrackingStatus: () => bridge.getTrackingStatus(),
+    startTracking: (cfg) => bridge.startTracking(cfg), stopTracking: () => bridge.stopTracking(), pauseTracking: () => bridge.pauseTracking(), resumeTracking: () => bridge.resumeTracking(), getTrackingStatus: () => bridge.getTrackingStatus(),
     getNativeStatus: () => bridge.getNativeLocationStatus(), openBatterySettings: () => bridge.openBatterySettings(),
     // classic streaming contract (bridges that push fixes to JS instead of uploading natively)
     watch({ intervalMs, minDistanceMeters }, onFix, onState) {

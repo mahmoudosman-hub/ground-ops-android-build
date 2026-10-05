@@ -131,3 +131,5 @@ export function openCheckOut({ api, provider, schedule, onDone }) {
   }
   modal = openModal({ title: t('Check Out'), body: spinner(), onClose: cleanup }); locate(); return modal;
 }
+
+export { fixPayload, LOC_HELP, infoRows, freshFix };

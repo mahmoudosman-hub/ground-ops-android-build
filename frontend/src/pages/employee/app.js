@@ -8,11 +8,12 @@ import { selectProvider } from '../../services/location/index.js';
 import { createQueue } from '../../services/offline-queue.js';
 import { onInstallChange, canInstall, promptInstall, isStandalone, isIos } from '../../services/pwa.js';
 import { createHome } from './home.js';
+import { createNotificationBell } from '../../components/notifications.js';
 
 export function mountEmployeeApp(root, deps = {}) {
   initLang();
   const api = deps.api || createApi('employee'), provider = deps.provider || selectProvider(), queue = deps.queue || createQueue();
-  let home = null, notice = null;
+  let home = null, notice = null, bell = null;
   const online = () => !(globalThis.navigator && globalThis.navigator.onLine === false);
   const netBadge = h('span', { id: 'net-badge' });
   const updateNet = () => mount(netBadge, badge(online() ? 'ONLINE' : 'OFFLINE'));
@@ -49,9 +50,10 @@ export function mountEmployeeApp(root, deps = {}) {
   }
   function view() {
     if (home) { home.destroy(); home = null; }
+    if (bell) { bell.destroy(); bell = null; }
     const s = api.session(); mount(headerRight);
     if (!s) return loginView();
-    mount(headerRight, h('span', { class: 'who' }, s.user.name), logoutBtn());
+    if (!s.user.must_change_password) { bell = createNotificationBell({ api }); mount(headerRight, bell.el, h('span', { class: 'who' }, s.user.name), logoutBtn()); } else mount(headerRight, h('span', { class: 'who' }, s.user.name), logoutBtn());
     if (s.user.must_change_password) return changePasswordView();
     home = createHome({ api, provider, queue }); mount(body, home.el);
   }

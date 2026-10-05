@@ -38,6 +38,9 @@ export function createNativeBridge(plugin) {
     /** Starts the foreground service. config: {apiUrl, token, employeeId, intervalMs, minDistanceMeters, heartbeatMs, syncIntervalMs, stopAtMs} */
     async startTracking(config) { return call('startTracking', config); },
     async stopTracking() { return call('stopTracking'); },
+    /** Break: stop sampling GPS but keep the service (and its notification) alive. Needs the app build that includes these methods. */
+    async pauseTracking() { return call('pauseTracking'); },
+    async resumeTracking() { return call('resumeTracking'); },
     /** The REAL state, read from the native service/database (never inferred by the web layer). */
     async getTrackingStatus() { return { ...emptyStatus, ...(await call('getTrackingStatus')) }; },
     /** permissions, GPS switch, notification permission, battery optimisation, background restriction, device info */

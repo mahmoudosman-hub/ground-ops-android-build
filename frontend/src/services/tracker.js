@@ -10,7 +10,7 @@ export function createTracker(opts) { return opts.provider.capabilities.nativeSy
 
 function createWebTracker({ api, provider, queue, userId, getSettings, onChange, intervalOverrideMs = 0, online = () => (globalThis.navigator ? globalThis.navigator.onLine !== false : true) }) {
   const st = { running: false, trackingState: 'STOPPED', lastFixAt: null, lastSyncAt: null, pending: 0, lastDistance: null, inside: null, lastFix: null, provider: provider.id, background: provider.capabilities.background, error: null, ended: false };
-  let stopWatch = null, flushing = false, wantFlush = false, lastReported = null, flushPromise = Promise.resolve();
+  let stopWatch = null, flushing = false, wantFlush = false, lastReported = null, flushPromise = Promise.resolve(), paused = false;
   const emit = () => onChange && onChange({ ...st });
   const toPoint = (f) => ({ timestamp: new Date(f.timestamp).toISOString(), latitude: f.latitude, longitude: f.longitude, accuracy_meters: Math.max(0, f.accuracy), ...(f.isMock === true || f.isMock === false ? { is_mock_location: f.isMock } : {}), location_source: f.source || 'unknown', tracking_source: provider.id === 'native' ? 'BACKGROUND_NATIVE' : 'FOREGROUND_WEB' });
 
@@ -48,19 +48,25 @@ function createWebTracker({ api, provider, queue, userId, getSettings, onChange,
     if (state === lastReported || state === 'ACTIVE' || !online()) return; lastReported = state;
     try { await api.call('submitLocation', { tracking_state: state }); } catch (e) { /* best effort */ }
   }
-  const onFix = async (fix) => { st.lastFixAt = fix.timestamp; st.lastFix = { latitude: fix.latitude, longitude: fix.longitude, accuracy: fix.accuracy, timestamp: fix.timestamp }; lastReported = null; await queue.push(userId, toPoint(fix)); await flush(); };
-  const onState = (state) => { st.trackingState = state; if (state !== 'ACTIVE') reportState(state); emit(); };
+  const onFix = async (fix) => { if (paused) return; st.lastFixAt = fix.timestamp; st.lastFix = { latitude: fix.latitude, longitude: fix.longitude, accuracy: fix.accuracy, timestamp: fix.timestamp }; lastReported = null; await queue.push(userId, toPoint(fix)); await flush(); };
+  const onState = (state) => { if (paused) return; st.trackingState = state; if (state !== 'ACTIVE') reportState(state); emit(); };
 
   async function start() {
     if (st.running) return; const s = getSettings() || {};
     if (s.tracking_enabled === false) { st.trackingState = 'PAUSED'; st.error = 'TRACKING_DISABLED'; emit(); return; }
     st.running = true; st.ended = false; st.trackingState = 'ACTIVE'; emit();
-    const intervalMs = intervalOverrideMs || Math.max(1, s.location_interval_minutes || 5) * 60000;
-    stopWatch = provider.watch({ intervalMs, minDistanceMeters: s.minimum_distance_meters || 0 }, onFix, onState);
+    beginWatch();
     flush(); // sync anything left over from an earlier session
   }
-  async function stop() { if (stopWatch) { try { stopWatch(); } catch (e) { /* ignore */ } stopWatch = null; } st.running = false; st.trackingState = 'STOPPED'; emit(); }
-  return { start, stop, flush, state: () => ({ ...st }), onOnline: () => flush() };
+  function beginWatch() {
+    const s = getSettings() || {}, intervalMs = intervalOverrideMs || Math.max(1, s.location_interval_minutes || 5) * 60000;
+    stopWatch = provider.watch({ intervalMs, minDistanceMeters: s.minimum_distance_meters || 0 }, onFix, onState);
+  }
+  /** Break: stop sampling the location (the server also ignores points inside a break). Queued points still sync. */
+  function pause() { if (!st.running || paused) return; paused = true; if (stopWatch) { try { stopWatch(); } catch (e) { /* ignore */ } stopWatch = null; } st.trackingState = 'ON_BREAK'; emit(); }
+  function resume() { if (!paused) return; paused = false; if (!st.running) return; st.trackingState = 'ACTIVE'; beginWatch(); emit(); flush(); }
+  async function stop() { paused = false; if (stopWatch) { try { stopWatch(); } catch (e) { /* ignore */ } stopWatch = null; } st.running = false; st.trackingState = 'STOPPED'; emit(); }
+  return { start, stop, pause, resume, flush, state: () => ({ ...st }), onOnline: () => flush() };
 }
 
 /**
@@ -70,7 +76,7 @@ function createWebTracker({ api, provider, queue, userId, getSettings, onChange,
  */
 function createNativeTracker({ api, provider, userId, getSettings, getShift, onChange, pollMs = 10000, now = () => Date.now() }) {
   const st = { running: false, trackingState: 'STOPPED', lastFixAt: null, lastSyncAt: null, pending: 0, lastDistance: null, inside: null, lastFix: null, provider: 'native', background: true, error: null, ended: false, native: null };
-  let timer = null, config = null, lastRestart = 0, wantRunning = false;
+  let timer = null, config = null, lastRestart = 0, wantRunning = false, paused = false;
   const emit = () => onChange && onChange({ ...st });
 
   function buildConfig() {
@@ -84,6 +90,7 @@ function createNativeTracker({ api, provider, userId, getSettings, getShift, onC
     let s; try { s = await provider.getTrackingStatus(); } catch (e) { st.error = 'STATUS_UNREADABLE'; emit(); return; }
     st.native = s; st.pending = s.pendingPoints || 0; st.lastFixAt = s.lastFixAt || null; st.lastSyncAt = s.lastSyncAt || null; st.error = s.lastError || null;
     if (s.lastLatitude !== undefined && s.lastLatitude !== null) st.lastFix = { latitude: s.lastLatitude, longitude: s.lastLongitude, accuracy: s.lastAccuracy, timestamp: s.lastFixAt };
+    if (paused && !s.ended) { st.trackingState = 'ON_BREAK'; emit(); return; } // on a break the phone may stop sampling: that is expected, not a failure
     if (s.ended) { st.ended = true; st.running = false; st.trackingState = 'STOPPED'; wantRunning = false; clearInterval(timer); timer = null; }
     else if (s.running) { st.running = true; st.trackingState = s.state && s.state !== 'STOPPED' ? s.state : 'ACTIVE'; }
     else if (wantRunning) { // we expect tracking, the OS stopped the service: say so, and try to bring it back (allowed while the app is in the foreground)
@@ -101,6 +108,8 @@ function createNativeTracker({ api, provider, userId, getSettings, getShift, onC
     try { await provider.startTracking(config); } catch (e) { wantRunning = false; st.trackingState = e.state || 'UNAVAILABLE'; st.error = e.code || e.state || 'START_FAILED'; emit(); return; }
     st.running = true; st.trackingState = 'ACTIVE'; emit(); await refresh(); timer = setInterval(refresh, pollMs);
   }
-  async function stop() { wantRunning = false; clearInterval(timer); timer = null; try { await provider.stopTracking(); } catch (e) { /* already stopped */ } st.running = false; st.trackingState = 'STOPPED'; emit(); }
-  return { start, stop, flush: refresh, state: () => ({ ...st }), onOnline: refresh, refresh };
+  async function stop() { paused = false; wantRunning = false; clearInterval(timer); timer = null; try { await provider.stopTracking(); } catch (e) { /* already stopped */ } st.running = false; st.trackingState = 'STOPPED'; emit(); }
+  async function pause() { if (paused || !wantRunning) return; paused = true; st.trackingState = 'ON_BREAK'; emit(); try { if (provider.pauseTracking) await provider.pauseTracking(); } catch (e) { /* older app build: the server still ignores break points */ } }
+  async function resume() { if (!paused) return; paused = false; try { if (provider.resumeTracking) await provider.resumeTracking(); } catch (e) { /* ignore */ } await refresh(); }
+  return { start, stop, pause, resume, flush: refresh, state: () => ({ ...st }), onOnline: refresh, refresh };
 }

@@ -11,6 +11,7 @@ const BADGES = {
   GPS_DISABLED: ['bad', 'GPS disabled'], UNAVAILABLE: ['muted', 'Tracking unavailable'], TRACKING_UNAVAILABLE: ['warn', 'Tracking unavailable'], STOPPED: ['muted', 'Tracking off'],
   POSSIBLE_SPOOFING: ['bad', 'Possible spoofing'], MISSING_CHECKOUT: ['warn', 'Missing check-out'], LOW_ACCURACY: ['warn', 'Low accuracy'], CHECKOUT_OUTSIDE_GEOFENCE: ['warn', 'Checked out outside branch'],
   CRITICAL: ['bad', 'Critical'], WARN: ['warn', 'Warning'], INFO: ['info', 'Info'],
+  ON_BREAK: ['info', 'On break'], BREAK_EXCEEDED: ['bad', 'Break over limit'],
   EXIT_GEOFENCE: ['bad', 'Left branch'], ENTER_GEOFENCE: ['ok', 'Returned'], ONLINE: ['ok', 'Online'], OFFLINE: ['bad', 'Offline']
 };
 export function badge(code, label) {

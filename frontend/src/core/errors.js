@@ -11,6 +11,7 @@ const MAP = {
   NO_ASSIGNMENT: 'You have no shift assigned for today.', CHECKIN_WINDOW_CLOSED: 'Check-in is not open right now.', ON_LEAVE: 'You are on leave for this date.',
   SELFIE_REQUIRED: 'A selfie is required to check in.', INVALID_IMAGE: 'The selfie could not be used. Take it again.', IMAGE_TOO_LARGE: 'The selfie is too large. Take it again.',
   NO_ACTIVE_SHIFT: 'There is no active shift.', SERVER_BUSY: 'The server is busy. Try again in a moment.', ALREADY_EXISTS: 'This already exists.', NOT_FOUND: 'Not found.',
+  ALREADY_ON_BREAK: 'You are already on a break.', NOT_ON_BREAK: 'You are not on a break.', BREAK_ALLOWANCE_USED: 'You have used all your break time for this shift.', MOCK_LOCATION_REJECTED: 'A fake location was detected.',
   BRANCH_IN_USE: 'This branch still has current or future assignments.', ASSIGNMENT_LOCKED: 'This assignment can no longer be changed (attendance exists).', EXPORT_TOO_LARGE: 'Too many rows to export. Narrow the date range or add filters.'
 };
 export function errorMessage(e) {

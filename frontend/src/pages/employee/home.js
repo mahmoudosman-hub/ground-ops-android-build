@@ -6,6 +6,7 @@ import { badge, button, spinner, errorBox, toast, toastError, dataTable } from '
 import { createTracker } from '../../services/tracker.js';
 import { cfg } from '../../core/config.js';
 import { openCheckIn, openCheckOut } from './checkin.js';
+import { breakCard } from './breaks.js';
 import { openTrackingHelp } from './native-help.js';
 
 const CACHE = (id) => `gops.schedule.${id}`;
@@ -38,7 +39,7 @@ export function createHome({ api, provider, queue }) {
     const a = schedule.attendance, end = schedule.assignment && schedule.assignment.scheduled_end ? Date.parse(schedule.assignment.scheduled_end) : 0;
     // Offline start-up with a cached "checked in" schedule: keep collecting points into the durable queue (the server rejects stale shifts when we reconnect).
     const live = fromCache ? Date.now() < end + 6 * 3600000 : schedule.window_state !== 'NONE';
-    if (a && a.state === 'CHECKED_IN' && live) tracker.start(); else tracker.stop();
+    if (a && a.state === 'CHECKED_IN' && live) { tracker.start(); if (!fromCache) { if (schedule.break && schedule.break.on_break) tracker.pause(); else tracker.resume(); } } else tracker.stop();
   }
 
   async function checkGps() {
@@ -104,6 +105,10 @@ export function createHome({ api, provider, queue }) {
     } else btn = h('p', { class: 'alert alert-ok', id: 'shift-done' }, t('Your shift is complete. Thank you!'));
     return h('section', { class: 'actions' }, btn, msg ? h('p', { class: 'hint', id: 'action-msg' }, msg) : null);
   }
+  function breakNode() {
+    if (!schedule || fromCache || !schedule.break || !schedule.attendance || schedule.attendance.state !== 'CHECKED_IN') return null;
+    return breakCard({ schedule, api, provider, online: isOnline(), onDone: () => { refresh(); } });
+  }
   function historyCard() {
     if (!history || !history.length) return null;
     return h('section', { class: 'card' }, h('h2', {}, t('Last 7 days')), dataTable({ columns: [{ key: 'work_date', label: 'Date' }, { key: 'check_in_time', label: 'In', render: (r) => fmtTime(r.check_in_time) }, { key: 'check_out_time', label: 'Out', render: (r) => fmtTime(r.check_out_time) },
@@ -116,12 +121,12 @@ export function createHome({ api, provider, queue }) {
       fromCache ? h('div', { class: 'alert alert-warn', id: 'cache-note' }, t('Showing your last saved schedule ({t}). Connect to refresh.', { t: fmtDateTime(new Date(fromCache).toISOString()) })) : null,
       loadError ? errorBox(loadError) : null, !schedule && !loadError ? spinner() : null,
       schedule ? h('div', { class: 'greeting' }, h('h1', {}, schedule.employee.name), h('p', { class: 'hint' }, t('Employee ID {id}', { id: schedule.employee.employee_id }))) : null,
-      shiftCard(), actions(), gpsCard(), trackingCard(), historyCard());
+      shiftCard(), actions(), breakNode(), gpsCard(), trackingCard(), historyCard());
   }
   const onVis = () => { if (globalThis.document.visibilityState === 'visible') refresh(); };
   const onOnline = () => { tracker.onOnline(); refresh(); };
   globalThis.document.addEventListener('visibilitychange', onVis); globalThis.addEventListener('online', onOnline); globalThis.addEventListener('offline', render);
-  const poll = setInterval(() => { if (isOnline()) refresh(); }, 60000);
+  const poll = setInterval(() => { if (isOnline()) refresh(); }, 60000), tick = setInterval(() => { if (schedule && schedule.break && schedule.break.on_break) render(); }, 30000); // keeps the break counter moving
   render(); refresh();
-  return { el, refresh, tracker, destroy() { destroyed = true; clearInterval(poll); tracker.stop(); globalThis.document.removeEventListener('visibilitychange', onVis); globalThis.removeEventListener('online', onOnline); globalThis.removeEventListener('offline', render); } };
+  return { el, refresh, tracker, destroy() { destroyed = true; clearInterval(poll); clearInterval(tick); tracker.stop(); globalThis.document.removeEventListener('visibilitychange', onVis); globalThis.removeEventListener('online', onOnline); globalThis.removeEventListener('offline', render); } };
 }

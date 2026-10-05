@@ -5,7 +5,7 @@ import { badge, button, buildForm, opt, dataTable, pager, spinner, errorBox, toa
 import { clean } from './lookups.js';
 
 const REPORTS = [['daily_attendance', 'Daily Attendance'], ['late_employees', 'Late Employees'], ['absent_employees', 'Absent Employees'], ['on_leave_employees', 'On-Leave Employees'], ['geofence_violations', 'Geofence Violations'], ['time_outside_branch', 'Time Outside Assigned Branch'],
-  ['tracking_unavailable', 'Tracking Unavailable'], ['employee_history', 'Employee Attendance History'], ['branch_attendance', 'Branch Attendance'], ['shift_performance', 'Shift Performance']];
+  ['tracking_unavailable', 'Tracking Unavailable'], ['employee_history', 'Employee Attendance History'], ['branch_attendance', 'Branch Attendance'], ['shift_performance', 'Shift Performance'], ['breaks', 'Breaks']];
 const STATUSES = ['', 'ON_TIME', 'LATE', 'ABSENT', 'ON_LEAVE', 'NOT_CHECKED_IN', 'CHECKED_IN', 'CHECKED_OUT', 'MISSING_CHECKOUT'];
 const humanize = (k) => k.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 
