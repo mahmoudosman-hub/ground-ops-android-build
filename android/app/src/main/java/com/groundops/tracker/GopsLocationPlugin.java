@@ -125,6 +125,18 @@ public class GopsLocationPlugin extends Plugin {
         JSObject o = new JSObject(); o.put("stopped", true); call.resolve(o);
     }
 
+    /** Break: GPS sampling stops, the service stays alive. */
+    @PluginMethod public void pauseTracking(PluginCall call) {
+        LocationForegroundService s = LocationForegroundService.instance;
+        if (s == null) { call.reject("Tracking service is not running", "NOT_RUNNING"); return; }
+        s.pauseTracking(); JSObject o = new JSObject(); o.put("paused", true); call.resolve(o);
+    }
+    @PluginMethod public void resumeTracking(PluginCall call) {
+        LocationForegroundService s = LocationForegroundService.instance;
+        if (s == null) { call.reject("Tracking service is not running", "NOT_RUNNING"); return; }
+        s.resumeTracking(); JSObject o = new JSObject(); o.put("paused", false); call.resolve(o);
+    }
+
     @PluginMethod public void getTrackingStatus(PluginCall call) {
         try { call.resolve(JSObject.fromJSONObject(LocationForegroundService.snapshot(ctx()))); } catch (JSONException e) { call.reject("status unreadable", "STATUS_UNREADABLE"); }
     }

@@ -57,6 +57,7 @@ public final class TrackingCore {
     private final Config cfg; private final Store store; private final Transport transport; private final Clock clock;
     private long lastRecordedTs = -1, lastFixAt, lastSyncAt, nextAttemptAt, lastSyncAttemptAt;
     private double lastRecLat, lastRecLon;
+    private boolean paused; // captain is on a break: no sampling, no "unavailable" claims
     private int failures; private boolean ended; private String endedReason, lastError, providerState, reportedState;
     private Double lastLat, lastLon, lastAcc, lastDistance; private Boolean inside;
 
@@ -76,7 +77,7 @@ public final class TrackingCore {
 
     /** Called for every GPS fix from the OS. Returns true when the fix was queued for upload. */
     public synchronized boolean onFix(Fix f) {
-        if (ended) return false;
+        if (ended || paused) return false;
         lastFixAt = clock.now(); lastLat = f.lat; lastLon = f.lon; lastAcc = f.accuracy; providerState = null;
         if (lastRecordedTs >= 0) {
             long gap = f.timeMs - lastRecordedTs;
@@ -98,6 +99,10 @@ public final class TrackingCore {
         lastRecordedTs = f.timeMs; lastRecLat = f.lat; lastRecLon = f.lon;
         return true;
     }
+
+    /** Break: while paused nothing is recorded and the state reads ON_BREAK; queued points are still uploaded. On resume the next fix is recorded immediately. */
+    public synchronized void setPaused(boolean p) { if (paused && !p) { lastRecordedTs = -1; providerState = null; } paused = p; }
+    public synchronized boolean isPaused() { return paused; }
 
     /** The OS/provider told us tracking cannot work (permission revoked, GPS switched off...). Reported to the server when possible. */
     public synchronized void setProviderState(String state) {
@@ -173,6 +178,7 @@ public final class TrackingCore {
         s.running = serviceRunning && !ended; s.lastFixAt = lastFixAt; s.lastSyncAt = lastSyncAt; s.pending = store.count(cfg.employeeId);
         s.lastLat = lastLat; s.lastLon = lastLon; s.lastAccuracy = lastAcc; s.lastDistance = lastDistance; s.inside = inside;
         if (!s.running) s.state = "STOPPED";
+        else if (paused) s.state = "ON_BREAK";
         else if (providerState != null) s.state = providerState;
         else if (lastFixAt == 0 || now - lastFixAt > Math.max(2 * cfg.intervalMs, cfg.heartbeatMs)) s.state = "UNAVAILABLE"; // no recent fix: never claim ACTIVE
         else s.state = "ACTIVE";

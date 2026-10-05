@@ -82,13 +82,18 @@ public class LocationForegroundService extends Service {
         return START_NOT_STICKY;
     }
 
-    private void goForeground() {
-        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        if (Build.VERSION.SDK_INT >= 26 && nm != null) nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Shift tracking", NotificationManager.IMPORTANCE_LOW));
+    private Notification buildNotification(boolean onBreak) {
         Intent open = getPackageManager().getLaunchIntentForPackage(getPackageName());
         PendingIntent pi = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification n = new NotificationCompat.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_stat_tracking).setContentTitle("Ground OPS Tracker")
-            .setContentText("Location tracking is active during your shift").setOngoing(true).setOnlyAlertOnce(true).setContentIntent(pi).setCategory(NotificationCompat.CATEGORY_SERVICE).build();
+            .setContentText(onBreak ? "On break - location paused" : "Location tracking is active during your shift").setOngoing(true).setOnlyAlertOnce(true).setContentIntent(pi).setCategory(NotificationCompat.CATEGORY_SERVICE).build();
+        return n;
+    }
+
+    private void goForeground() {
+        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (Build.VERSION.SDK_INT >= 26 && nm != null) nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Shift tracking", NotificationManager.IMPORTANCE_LOW));
+        Notification n = buildNotification(false);
         if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION); else startForeground(NOTIF_ID, n);
     }
 
@@ -152,7 +157,7 @@ public class LocationForegroundService extends Service {
 
     /** Reports the REAL reason when no usable provider/permission exists. */
     private void checkProviders() {
-        if (core == null || lm == null) return;
+        if (core == null || lm == null || core.isPaused()) return; // on a break location may be off: not an error
         if (!hasPermission()) { core.setProviderState("PERMISSION_DENIED"); return; }
         boolean gps = false, net = false;
         try { gps = lm.isProviderEnabled(LocationManager.GPS_PROVIDER); net = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER); } catch (RuntimeException e) { /* treated as off */ }
@@ -211,6 +216,29 @@ public class LocationForegroundService extends Service {
         stopForeground(true); stopSelf();
     }
     public void stopTracking() { shutdown("STOP_REQUESTED", false); }
+
+    /** Break: stop sampling the GPS but keep the service and its notification alive. Queued points still upload. */
+    public void pauseTracking() {
+        if (!running || io == null) return;
+        io.execute(new Runnable() { @Override public void run() {
+            if (core == null || core.isPaused()) return;
+            try { if (lm != null && listener != null) lm.removeUpdates(listener); } catch (RuntimeException e) { /* ignore */ }
+            core.setPaused(true); showNotification(true); persist();
+        } });
+    }
+
+    /** End of a break: sample again right away (the next fix is recorded immediately). */
+    public void resumeTracking() {
+        if (!running || io == null) return;
+        io.execute(new Runnable() { @Override public void run() {
+            if (core == null || !core.isPaused()) return;
+            core.setPaused(false); requestUpdates(); showNotification(false); persist();
+        } });
+    }
+
+    private void showNotification(boolean onBreak) {
+        try { NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE); if (nm != null) nm.notify(NOTIF_ID, buildNotification(onBreak)); } catch (RuntimeException e) { /* notification is cosmetic */ }
+    }
 
     @Override public void onDestroy() { if (running) shutdown("SERVICE_DESTROYED", false); instance = null; super.onDestroy(); }
     @Override public void onTaskRemoved(Intent rootIntent) { /* keep tracking: the foreground service survives the app being swiped away on most devices */ super.onTaskRemoved(rootIntent); }
