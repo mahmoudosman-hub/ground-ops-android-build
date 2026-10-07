@@ -107,6 +107,8 @@ private long lastSelfiePollMs = 0L;
         c.intervalMs = num(m, "intervalMs", 300000); c.heartbeatMs = num(m, "heartbeatMs", 600000); c.syncIntervalMs = num(m, "syncIntervalMs", 300000);
         c.stopAtMs = num(m, "stopAtMs", System.currentTimeMillis() + 12L * 3600000L); c.minDistanceMeters = num(m, "minDistanceMeters", 25);
         employeeId = c.employeeId;
+cfgApiUrl = c.apiUrl == null ? "" : c.apiUrl;
+cfgToken = c.token == null ? "" : c.token;
         store = new SqlitePointStore(this);
         core = new TrackingCore(c, store, new HttpTransport(30000, false), new TrackingCore.Clock() { @Override public long now() { return System.currentTimeMillis(); } });
         thread = new HandlerThread("gops-location"); thread.start(); handler = new Handler(thread.getLooper()); io = Executors.newSingleThreadExecutor();
