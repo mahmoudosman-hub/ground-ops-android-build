@@ -54,8 +54,8 @@ public class LocationForegroundService extends Service {
     private TrackingCore core; private TrackingPrefs prefs; private SqlitePointStore store; private LocationManager lm; private ConnectivityManager cm;
     private HandlerThread thread; private Handler handler; private ExecutorService io; private LocationListener listener; private ConnectivityManager.NetworkCallback netCb;
     private volatile boolean running; private String employeeId = "";
-private String cfgApiUrl = "", cfgToken = "";
-private long lastSelfiePollMs = 0L;
+    private String cfgApiUrl = "", cfgToken = "";
+    private long lastSelfiePollMs = 0L;
 
     public static JSONObject snapshot(Context ctx) {
         LocationForegroundService s = instance;
@@ -107,8 +107,8 @@ private long lastSelfiePollMs = 0L;
         c.intervalMs = num(m, "intervalMs", 300000); c.heartbeatMs = num(m, "heartbeatMs", 600000); c.syncIntervalMs = num(m, "syncIntervalMs", 300000);
         c.stopAtMs = num(m, "stopAtMs", System.currentTimeMillis() + 12L * 3600000L); c.minDistanceMeters = num(m, "minDistanceMeters", 25);
         employeeId = c.employeeId;
-cfgApiUrl = c.apiUrl == null ? "" : c.apiUrl;
-cfgToken = c.token == null ? "" : c.token;
+        cfgApiUrl = c.apiUrl == null ? "" : c.apiUrl;
+        cfgToken = c.token == null ? "" : c.token;
         store = new SqlitePointStore(this);
         core = new TrackingCore(c, store, new HttpTransport(30000, false), new TrackingCore.Clock() { @Override public long now() { return System.currentTimeMillis(); } });
         thread = new HandlerThread("gops-location"); thread.start(); handler = new Handler(thread.getLooper()); io = Executors.newSingleThreadExecutor();
@@ -138,6 +138,11 @@ cfgToken = c.token == null ? "" : c.token;
                 if (core.shouldStop()) { shutdown(null, true); return; }
                 checkProviders();
                 if (core.syncDue(System.currentTimeMillis())) core.flush(false);
+                long __now = System.currentTimeMillis();
+                if (__now - lastSelfiePollMs >= 60000L) {
+                    lastSelfiePollMs = __now;
+                    SelfieCheckNotifier.pollAndNotify(LocationForegroundService.this, cfgApiUrl, cfgToken, employeeId);
+                }
                 persist();
                 if (core.shouldStop()) shutdown(null, true);
             } });
