@@ -54,6 +54,8 @@ public class LocationForegroundService extends Service {
     private TrackingCore core; private TrackingPrefs prefs; private SqlitePointStore store; private LocationManager lm; private ConnectivityManager cm;
     private HandlerThread thread; private Handler handler; private ExecutorService io; private LocationListener listener; private ConnectivityManager.NetworkCallback netCb;
     private volatile boolean running; private String employeeId = "";
+private String cfgApiUrl = "", cfgToken = "";
+private long lastSelfiePollMs = 0L;
 
     public static JSONObject snapshot(Context ctx) {
         LocationForegroundService s = instance;
