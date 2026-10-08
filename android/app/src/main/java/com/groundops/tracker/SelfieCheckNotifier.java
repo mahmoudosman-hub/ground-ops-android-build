@@ -7,6 +7,9 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.media.AudioAttributes;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Build;
 import android.util.Log;
 
@@ -23,20 +26,19 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * Polls the server for a pending selfie check and fires a native notification when one is due.
- * Runs from LocationForegroundService every minute. No interaction with the web layer:
- * tapping the notification opens the app, and the JS polls the server itself for the prompt.
+ * HIGH importance, MAX volume, custom vibration pattern, alarm-like sound.
  */
 public final class SelfieCheckNotifier {
 
     private static final String TAG = "GopsSelfieNotifier";
-    private static final String CHANNEL = "gops_selfie";
+    // New channel id so the old LOW-importance channel is not reused
+    private static final String CHANNEL = "gops_selfie_v2";
     private static final int NOTIF_ID = 4712;
     private static final String PREFS = "gops_selfie_notify";
     private static final String KEY_LAST_ID = "last_notified_id";
 
     private SelfieCheckNotifier() {}
 
-    /** Called from the tracking service's tick. Never throws. */
     public static void pollAndNotify(Context ctx, String apiUrl, String token, String employeeId) {
         if (ctx == null || apiUrl == null || token == null || employeeId == null) return;
         if (apiUrl.isEmpty() || token.isEmpty() || employeeId.isEmpty()) return;
@@ -96,11 +98,30 @@ public final class SelfieCheckNotifier {
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
+        // ---- Create the notification channel with HIGH importance + alarm sound ----
         if (Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel ch = new NotificationChannel(CHANNEL, "Selfie checks", NotificationManager.IMPORTANCE_HIGH);
-            ch.setDescription("Random selfie checks during a shift");
+            NotificationChannel ch = new NotificationChannel(
+                CHANNEL,
+                "Selfie checks (urgent)",
+                NotificationManager.IMPORTANCE_HIGH
+            );
+            ch.setDescription("Random selfie checks during a shift - plays sound and vibrates");
             ch.enableVibration(true);
+            // Long, staggered vibration pattern: wait, buzz, wait, buzz...
+            ch.setVibrationPattern(new long[] { 0, 700, 300, 700, 300, 700, 300, 700 });
             ch.setShowBadge(true);
+            ch.setBypassDnd(false); // respect Do Not Disturb to be polite
+
+            // Use the system's alarm ringtone as the notification sound
+            Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+            if (sound == null) sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            if (sound != null) {
+                AudioAttributes attrs = new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .build();
+                ch.setSound(sound, attrs);
+            }
             nm.createNotificationChannel(ch);
         }
 
@@ -121,7 +142,8 @@ public final class SelfieCheckNotifier {
             .setContentText(text)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setAutoCancel(true)
             .setContentIntent(pi)
             .build();
