@@ -8,7 +8,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.media.AudioAttributes;
-import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.util.Log;
@@ -26,12 +25,13 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * Polls the server for a pending selfie check and fires a native notification.
- * HIGH importance + alarm sound + long vibration + full-screen intent (auto-opens the app).
+ * HIGH importance + custom adhan sound (res/raw/adhan.mp3) + long vibration.
+ * Falls back to the system alarm if the mp3 is missing.
  */
 public final class SelfieCheckNotifier {
 
     private static final String TAG = "GopsSelfieNotifier";
-    private static final String CHANNEL = "gops_selfie_v3";
+    private static final String CHANNEL = "gops_selfie_v4"; // bumped so old channel is discarded
     private static final int NOTIF_ID = 4712;
     private static final String PREFS = "gops_selfie_notify";
     private static final String KEY_LAST_ID = "last_notified_id";
@@ -93,27 +93,35 @@ public final class SelfieCheckNotifier {
         fireNotification(ctx, due);
     }
 
+    private static Uri soundUri(Context ctx) {
+        try {
+            int resId = ctx.getResources().getIdentifier("adhan", "raw", ctx.getPackageName());
+            if (resId != 0) {
+                return Uri.parse("android.resource://" + ctx.getPackageName() + "/" + resId);
+            }
+        } catch (Throwable t) { /* fall through */ }
+        Uri fallback = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM);
+        if (fallback == null) fallback = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE);
+        if (fallback == null) fallback = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION);
+        return fallback;
+    }
+
     private static void fireNotification(Context ctx, JSONObject due) {
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
-        // ---------- Channel: HIGH importance + alarm sound + long vibration ----------
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationChannel ch = new NotificationChannel(
                 CHANNEL,
                 "Selfie checks (urgent)",
                 NotificationManager.IMPORTANCE_HIGH
             );
-            ch.setDescription("Random selfie checks during a shift");
+            ch.setDescription("Random selfie checks during a shift - plays the adhan and vibrates");
             ch.enableVibration(true);
-            // Long, staggered vibration: wait, buzz, wait, buzz...
             ch.setVibrationPattern(new long[] { 0, 800, 400, 800, 400, 800, 400, 800, 400, 800 });
             ch.setShowBadge(true);
 
-            // System alarm sound (loudest available)
-            Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-            if (sound == null) sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
-            if (sound == null) sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            Uri sound = soundUri(ctx);
             if (sound != null) {
                 AudioAttributes attrs = new AudioAttributes.Builder()
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -124,7 +132,6 @@ public final class SelfieCheckNotifier {
             nm.createNotificationChannel(ch);
         }
 
-        // ---------- Intent: opens the app directly ----------
         Intent open = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName());
         if (open == null) return;
         open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
@@ -153,7 +160,6 @@ public final class SelfieCheckNotifier {
             .build();
 
         try {
-            // Uses a special tag so it appears even when other notifications are cleared
             nm.notify("gops_selfie_urgent", NOTIF_ID, n);
         } catch (RuntimeException e) { Log.w(TAG, "notify failed", e); }
     }
