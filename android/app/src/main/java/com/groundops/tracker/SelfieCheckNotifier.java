@@ -25,14 +25,13 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Polls the server for a pending selfie check and fires a native notification when one is due.
- * HIGH importance, MAX volume, custom vibration pattern, alarm-like sound.
+ * Polls the server for a pending selfie check and fires a native notification.
+ * HIGH importance + alarm sound + long vibration + full-screen intent (auto-opens the app).
  */
 public final class SelfieCheckNotifier {
 
     private static final String TAG = "GopsSelfieNotifier";
-    // New channel id so the old LOW-importance channel is not reused
-    private static final String CHANNEL = "gops_selfie_v2";
+    private static final String CHANNEL = "gops_selfie_v3";
     private static final int NOTIF_ID = 4712;
     private static final String PREFS = "gops_selfie_notify";
     private static final String KEY_LAST_ID = "last_notified_id";
@@ -98,36 +97,40 @@ public final class SelfieCheckNotifier {
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
-        // ---- Create the notification channel with HIGH importance + alarm sound ----
+        // ---------- Channel: HIGH importance + alarm sound + long vibration ----------
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationChannel ch = new NotificationChannel(
                 CHANNEL,
                 "Selfie checks (urgent)",
                 NotificationManager.IMPORTANCE_HIGH
             );
-            ch.setDescription("Random selfie checks during a shift - plays sound and vibrates");
+            ch.setDescription("Random selfie checks during a shift");
             ch.enableVibration(true);
-            // Long, staggered vibration pattern: wait, buzz, wait, buzz...
-            ch.setVibrationPattern(new long[] { 0, 700, 300, 700, 300, 700, 300, 700 });
+            // Long, staggered vibration: wait, buzz, wait, buzz...
+            ch.setVibrationPattern(new long[] { 0, 800, 400, 800, 400, 800, 400, 800, 400, 800 });
             ch.setShowBadge(true);
-            ch.setBypassDnd(false); // respect Do Not Disturb to be polite
 
-            // Use the system's alarm ringtone as the notification sound
+            // System alarm sound (loudest available)
             Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+            if (sound == null) sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
             if (sound == null) sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
             if (sound != null) {
                 AudioAttributes attrs = new AudioAttributes.Builder()
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setUsage(AudioAttributes.USAGE_ALARM)
                     .build();
                 ch.setSound(sound, attrs);
             }
             nm.createNotificationChannel(ch);
         }
 
+        // ---------- Intent: opens the app directly ----------
         Intent open = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName());
         if (open == null) return;
-        open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                    | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
         PendingIntent pi = PendingIntent.getActivity(ctx, 9001, open, flags);
@@ -138,17 +141,21 @@ public final class SelfieCheckNotifier {
 
         Notification n = new NotificationCompat.Builder(ctx, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_tracking)
-            .setContentTitle("Selfie check requested")
+            .setContentTitle("📸 Selfie check requested")
             .setContentText(text)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(text))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setVibrate(new long[] { 0, 800, 400, 800, 400, 800, 400, 800, 400, 800 })
             .setAutoCancel(true)
             .setContentIntent(pi)
             .build();
 
-        try { nm.notify(NOTIF_ID, n); } catch (RuntimeException e) { Log.w(TAG, "notify failed", e); }
+        try {
+            // Uses a special tag so it appears even when other notifications are cleared
+            nm.notify("gops_selfie_urgent", NOTIF_ID, n);
+        } catch (RuntimeException e) { Log.w(TAG, "notify failed", e); }
     }
 
     private static String esc(String s) {
