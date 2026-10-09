@@ -1,7 +1,6 @@
 /**
- * Ground OPS - Delivery 18 v2
- * Adds a "Late permission" button. Uses separate Hour/Minute/AM-PM selects
- * to avoid the Android 12-hour picker ambiguity.
+ * Ground OPS - Delivery 18 v3
+ * Late permission - creates the request directly as PENDING_ADMIN (no DRAFT step).
  */
 (function () {
   'use strict';
@@ -39,7 +38,7 @@
       return fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: action, token: t, payload: payload, client: 'delivery18/2' }),
+        body: JSON.stringify({ action: action, token: t, payload: payload, client: 'delivery18/3' }),
         redirect: 'follow',
         credentials: 'omit'
       }).then(function (r) { return r.json(); }).then(function (b) {
@@ -99,7 +98,7 @@
           '<h2 style="margin:0;font-size:19px">⏰ Late permission</h2>' +
           '<button id="gops-late-close" style="background:transparent;border:0;font-size:24px;cursor:pointer;color:#666">×</button>' +
         '</div>' +
-        '<p style="margin:0 0 14px;color:#666;font-size:13px">Ask the admin for permission to arrive later than your shift start. Must be submitted at least 30 minutes before your shift starts.</p>' +
+        '<p style="margin:0 0 14px;color:#666;font-size:13px">Ask the admin for permission to arrive later than your shift start.</p>' +
         '<label style="display:block;margin-bottom:10px"><span style="display:block;font-weight:600;margin-bottom:4px;font-size:13px">Date</span>' +
         '<input type="date" id="gops-late-date" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;font-size:15px;box-sizing:border-box"></label>' +
         '<div style="display:block;margin-bottom:10px">' +
@@ -159,7 +158,6 @@
       if (!h || h < 1 || h > 12) { err.textContent = 'Pick an hour.'; return; }
       if (!note) { err.textContent = 'Write a reason.'; return; }
 
-      // Convert 12-hour to 24-hour
       var h24 = h;
       if (ampm === 'PM' && h !== 12) h24 = h + 12;
       if (ampm === 'AM' && h === 12) h24 = 0;
@@ -172,13 +170,15 @@
 
       call('createRequest', { type: 'LATE_PERMISSION', date_from: date, time_value: timeStr, note: note })
         .then(function (res) {
+          // Server already created the request as PENDING_ADMIN.
+          // Attach a file if the user provided one, then we're done.
           var rid = res.request.request_id;
           var f = fileI.files && fileI.files[0];
-          if (!f) return call('submitRequest', { request_id: rid });
+          if (!f) return { rid: rid };
           return toBase64(f).then(function (b64) {
             var mime = f.type || 'image/jpeg';
             return call('attachRequestFile', { request_id: rid, file_base64: b64, file_mime: mime, file_name: f.name || 'proof' })
-              .then(function () { return call('submitRequest', { request_id: rid }); });
+              .then(function () { return { rid: rid }; });
           });
         })
         .then(function () {
