@@ -13,7 +13,7 @@
   // ---------- IMPORTANT ----------
   // Update this constant each time you rebuild the APK.
   // It must match the "version" you enter in the Admin Settings.
-  var INSTALLED_VERSION = '1.0.3';
+  var INSTALLED_VERSION = '1.0.1';
 
   var API_URL = null;
   var CHECK_INTERVAL_MS = 6 * 3600 * 1000; // 6 hours
