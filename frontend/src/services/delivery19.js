@@ -1,25 +1,55 @@
 /**
- * Ground OPS - Delivery 19 v2
- * App update checker with fast polling.
- *   - Checks on EVERY app open.
- *   - Checks every 15 minutes while the app is open.
- *   - Checks when the app comes back to the foreground.
- *   - Admin can bump the version → app picks it up in ≤15 min.
+ * Ground OPS - Delivery 19 v3
+ * Version checker that reads the REAL version from the APK (via Capacitor App plugin).
+ * Falls back to a hardcoded value on the PWA.
+ *
+ * On every check it:
+ *   1. Reads the app's own version (native or hardcoded).
+ *   2. Asks the server for the latest version.
+ *   3. If the server version is newer AND we haven't dismissed it, shows the banner.
+ *   4. Also verifies the app was actually updated (localStorage trail).
  */
 (function () {
   'use strict';
 
   if (/admin\.html/i.test(window.location.pathname)) return;
 
-  // ---- IMPORTANT: update this constant when you build a new APK ----
-  var INSTALLED_VERSION = '1.0.3';
+  // PWA fallback only. On the APK, the version is read from the native build.
+  var PWA_FALLBACK_VERSION = '1.0.1';
 
   var API_URL = null;
-  var CHECK_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+  var CHECK_INTERVAL_MS = 15 * 60 * 1000;
   var DISMISS_MS = 24 * 3600 * 1000;
   var LAST_CHECK_KEY = 'gops.app.last_check';
   var DISMISS_V_KEY = 'gops.app.dismissed_v';
   var DISMISS_T_KEY = 'gops.app.dismissed_at';
+  var LAST_SEEN_APP_V_KEY = 'gops.app.last_seen_installed';
+
+  var _cachedAppVersion = null;
+
+  // Read the version from the native APK if possible, otherwise use the fallback.
+  function getAppVersion() {
+    if (_cachedAppVersion) return Promise.resolve(_cachedAppVersion);
+
+    return new Promise(function (resolve) {
+      try {
+        var P = window.Capacitor && window.Capacitor.Plugins;
+        if (P && P.App && typeof P.App.getInfo === 'function') {
+          P.App.getInfo().then(function (info) {
+            var v = (info && info.version) ? String(info.version) : PWA_FALLBACK_VERSION;
+            _cachedAppVersion = v;
+            resolve(v);
+          }).catch(function () {
+            _cachedAppVersion = PWA_FALLBACK_VERSION;
+            resolve(PWA_FALLBACK_VERSION);
+          });
+          return;
+        }
+      } catch (e) { /* ignore */ }
+      _cachedAppVersion = PWA_FALLBACK_VERSION;
+      resolve(PWA_FALLBACK_VERSION);
+    });
+  }
 
   function loadConfig() {
     if (API_URL) return Promise.resolve(API_URL);
@@ -60,7 +90,7 @@
     } catch (e) {}
   }
 
-  function showBanner(version, url, notes) {
+  function showBanner(installedVersion, latestVersion, url, notes) {
     var old = document.getElementById('gops-update-banner');
     if (old) old.remove();
 
@@ -72,8 +102,9 @@
       '<div style="display:flex;align-items:flex-start;gap:12px">' +
         '<div style="font-size:30px;line-height:1">🚀</div>' +
         '<div style="flex:1;min-width:0">' +
-          '<div style="font-weight:800;font-size:15px;margin-bottom:2px">New version available: ' + version + '</div>' +
+          '<div style="font-weight:800;font-size:15px;margin-bottom:2px">New version available: ' + latestVersion + '</div>' +
           '<div style="font-size:12px;opacity:.9">' + (notes || 'Important fixes and improvements. Please update.') + '</div>' +
+          '<div style="font-size:11px;opacity:.75;margin-top:4px">Your version: ' + installedVersion + '</div>' +
           '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">' +
             '<a href="' + url + '" target="_blank" rel="noopener" style="flex:1;min-width:120px;display:inline-block;text-align:center;padding:10px 14px;background:#fff;color:#0a84ff;border-radius:8px;font-weight:800;text-decoration:none;font-size:13px">⬇ Download now</a>' +
             '<button id="gops-upd-later" style="padding:10px 14px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">Later</button>' +
@@ -84,7 +115,7 @@
     document.body.appendChild(banner);
 
     function dismiss() {
-      markDismissed(version);
+      markDismissed(latestVersion);
       banner.style.opacity = '0';
       banner.style.transition = 'opacity .25s';
       setTimeout(function () { try { banner.remove(); } catch (e) {} }, 300);
@@ -94,45 +125,52 @@
   }
 
   function check(force) {
-    // On manual call (force=true) always check; otherwise respect the interval
     if (!force) {
       try {
         var last = parseInt(localStorage.getItem(LAST_CHECK_KEY) || '0', 10);
         if ((Date.now() - last) < CHECK_INTERVAL_MS) return;
       } catch (e) {}
     }
-    loadConfig().then(function () {
-      if (!API_URL) return;
-      fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'getAppVersion', payload: {}, client: 'update-check' }),
-        redirect: 'follow',
-        credentials: 'omit'
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (b) {
-          try { localStorage.setItem(LAST_CHECK_KEY, String(Date.now())); } catch (e) {}
-          if (!b || !b.success || !b.data) return;
-          var v = String(b.data.version || '');
-          var url = String(b.data.url || '');
-          var notes = String(b.data.notes || '');
-          if (!v || !url) return;
-          if (compareVersions(INSTALLED_VERSION, v) >= 0) return;
-          if (wasDismissed(v)) return;
-          showBanner(v, url, notes);
+
+    getAppVersion().then(function (appVersion) {
+      // Track transitions: if the app version changed since the last check, clear the dismissed flag.
+      try {
+        var prev = localStorage.getItem(LAST_SEEN_APP_V_KEY);
+        if (prev && prev !== appVersion) {
+          localStorage.removeItem(DISMISS_V_KEY);
+          localStorage.removeItem(DISMISS_T_KEY);
+        }
+        localStorage.setItem(LAST_SEEN_APP_V_KEY, appVersion);
+      } catch (e) {}
+
+      loadConfig().then(function () {
+        if (!API_URL) return;
+        fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'getAppVersion', payload: {}, client: 'update-check' }),
+          redirect: 'follow',
+          credentials: 'omit'
         })
-        .catch(function () {});
+          .then(function (r) { return r.json(); })
+          .then(function (b) {
+            try { localStorage.setItem(LAST_CHECK_KEY, String(Date.now())); } catch (e) {}
+            if (!b || !b.success || !b.data) return;
+            var v = String(b.data.version || '');
+            var url = String(b.data.url || '');
+            var notes = String(b.data.notes || '');
+            if (!v || !url) return;
+            if (compareVersions(appVersion, v) >= 0) return;
+            if (wasDismissed(v)) return;
+            showBanner(appVersion, v, url, notes);
+          })
+          .catch(function () {});
+      });
     });
   }
 
-  // 1) On app open (after 3 seconds)
   setTimeout(function () { check(true); }, 3000);
-
-  // 2) While the app is open: check every 15 minutes
   setInterval(function () { check(true); }, CHECK_INTERVAL_MS);
-
-  // 3) When the user returns to the app
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden) setTimeout(function () { check(true); }, 1500);
   });
