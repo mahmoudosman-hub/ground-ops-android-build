@@ -1,6 +1,6 @@
 /**
- * Ground OPS - Delivery 18 v3
- * Late permission - creates the request directly as PENDING_ADMIN (no DRAFT step).
+ * Ground OPS - Delivery 18 v4
+ * Late permission - creates PENDING_ADMIN directly, no submitRequest step.
  */
 (function () {
   'use strict';
@@ -38,7 +38,7 @@
       return fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: action, token: t, payload: payload, client: 'delivery18/3' }),
+        body: JSON.stringify({ action: action, token: t, payload: payload, client: 'delivery18/4' }),
         redirect: 'follow',
         credentials: 'omit'
       }).then(function (r) { return r.json(); }).then(function (b) {
@@ -168,17 +168,18 @@
       var origText = btn.textContent;
       btn.textContent = 'Sending...';
 
+      // 1) createRequest now sets the request directly to PENDING_ADMIN
       call('createRequest', { type: 'LATE_PERMISSION', date_from: date, time_value: timeStr, note: note })
         .then(function (res) {
-          // Server already created the request as PENDING_ADMIN.
-          // Attach a file if the user provided one, then we're done.
-          var rid = res.request.request_id;
+          var rid = res.request && res.request.request_id;
           var f = fileI.files && fileI.files[0];
-          if (!f) return { rid: rid };
+          if (!f || !rid) return { rid: rid };
+          // 2) Optionally attach a file
           return toBase64(f).then(function (b64) {
             var mime = f.type || 'image/jpeg';
             return call('attachRequestFile', { request_id: rid, file_base64: b64, file_mime: mime, file_name: f.name || 'proof' })
-              .then(function () { return { rid: rid }; });
+              .then(function () { return { rid: rid }; })
+              .catch(function () { return { rid: rid }; }); // file failure should not block
           });
         })
         .then(function () {
