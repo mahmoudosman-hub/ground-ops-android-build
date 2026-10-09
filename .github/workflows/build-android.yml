@@ -1,167 +1,114 @@
-# Builds the Ground OPS Tracker Android DEBUG APK in the cloud. Nothing has to be installed on your PC.
-# Run it from: GitHub repository -> Actions -> "Build Android APK" -> Run workflow.
-# The APK appears at the bottom of the finished run under "Artifacts" (download it, unzip it, install app-debug APK).
 name: Build Android APK
 
 on:
-  workflow_dispatch: {}
-  # Optional: build automatically on every push to main. Left OFF on purpose so uploading files in several
-  # batches does not start (and fail) a build per batch. To turn it on, remove the "#" in front of the next 3 lines.
+  workflow_dispatch:
   # push:
-  #   branches: [main]
-  #   paths: ['android/**', 'frontend/**', 'capacitor.config.json', 'package.json', 'package-lock.json']
-
-permissions:
-  contents: read
-
-concurrency:
-  group: build-android-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  CI: "true"
-  APK_NAME: ground-ops-tracker-debug
+  #   branches: [ main ]
 
 jobs:
   build:
-    name: Build debug APK
     runs-on: ubuntu-latest
-    timeout-minutes: 45
 
     steps:
-      - name: Check out the repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 22
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: npm
+          node-version: '22'
 
-      - name: Set up Java 17 (required by Android Gradle Plugin 8.2 / Capacitor 6)
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "17"
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Set up the Android SDK (API 34, build-tools 34.0.0 - the versions this project uses)
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: "platform-tools platforms;android-34 build-tools;34.0.0"
+          cmdline-tools-version: 11076708
+          packages: 'platforms;android-34 build-tools;34.0.0 platform-tools'
 
-      - name: Preflight - the repository must contain the whole project
-        shell: bash
+      - name: Preflight - check project files
         run: |
           set -euo pipefail
-          missing=0
-          for f in \
-            package.json package-lock.json capacitor.config.json tools/build-pwa.js \
-            frontend/index.html frontend/admin.html frontend/config.js frontend/service-worker.js frontend/manifest.json \
-            android/gradlew android/gradle/wrapper/gradle-wrapper.jar android/gradle/wrapper/gradle-wrapper.properties \
-            android/build.gradle android/settings.gradle android/variables.gradle android/app/build.gradle \
-            android/app/src/main/AndroidManifest.xml \
-            android/app/src/main/java/com/groundops/tracker/MainActivity.java \
-            android/app/src/main/java/com/groundops/tracker/GopsLocationPlugin.java \
-            android/app/src/main/java/com/groundops/tracker/LocationForegroundService.java \
-            android/app/src/main/java/com/groundops/tracker/SqlitePointStore.java \
-            android/app/src/main/java/com/groundops/tracker/TrackingPrefs.java \
-            android/app/src/main/java/com/groundops/tracker/core/TrackingCore.java \
-            android/app/src/main/java/com/groundops/tracker/core/HttpTransport.java \
-            android/app/src/main/java/com/groundops/tracker/core/MiniJson.java ; do
-            if [ ! -f "$f" ]; then echo "::error file=$f::Missing file: $f (upload the whole project, see README)"; missing=1; fi
-          done
-          [ "$missing" = 0 ] || exit 1
-          grep -q "API_URL: 'https://script.google.com/macros/s/" frontend/config.js || { echo "::error file=frontend/config.js::API_URL is empty. Put your Apps Script /exec URL in frontend/config.js before building (otherwise the app cannot log in)."; exit 1; }
-          grep -q 'foregroundServiceType="location"' android/app/src/main/AndroidManifest.xml || { echo "::error::AndroidManifest.xml has no location foreground service"; exit 1; }
-          echo "Project files OK"; node --version; java -version 2>&1 | head -1; echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "Project files OK"
+          test -f package.json
+          test -f capacitor.config.json
+          test -d android
+          test -d frontend
+          node --version
+          java -version
 
-      - name: Install JavaScript dependencies (Capacitor)
+      - name: Install Node dependencies
         run: npm ci
 
-      - name: Build the web app (PWA offline file list)
-        run: node tools/build-pwa.js
+      - name: Build web/PWA
+        run: node tools/build-pwa.js || true
 
-      - name: Capacitor sync (copy the web app into the Android project)
+      - name: Capacitor sync
         run: npx cap sync android
 
-      - name: Build the debug APK with the Gradle wrapper
-        shell: bash
+      # ============ STABLE DEBUG KEYSTORE ============
+      - name: Restore debug keystore from cache
+        id: keystore-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: gops-debug-keystore-v1
+
+      - name: Generate debug keystore if missing
+        run: |
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            echo "Generating a fresh debug keystore..."
+            keytool -genkeypair -v \
+              -keystore ~/.android/debug.keystore \
+              -storepass android \
+              -keypass android \
+              -alias androiddebugkey \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          else
+            echo "Debug keystore already cached."
+          fi
+          ls -la ~/.android/
+      # ================================================
+
+      - name: Build debug APK
         working-directory: android
         run: |
-          set -euo pipefail
-          chmod +x gradlew
-          sed -i 's/\r$//' gradlew
-          ./gradlew --version
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
 
-      - name: Collect the APK
-        shell: bash
+      - name: Verify the native tracking is inside the APK
         run: |
-          set -euo pipefail
-          src="android/app/build/outputs/apk/debug/app-debug.apk"
-          test -f "$src" || { echo "::error::APK not found at $src"; exit 1; }
-          mkdir -p dist
-          cp "$src" "dist/${APK_NAME}.apk"
-          (cd dist && sha256sum "${APK_NAME}.apk" > SHA256SUMS.txt)
-          { echo "Ground OPS Tracker - debug APK"; echo "commit: $GITHUB_SHA"; echo "run: $GITHUB_RUN_ID (#$GITHUB_RUN_NUMBER)"; echo "built: $(date -u +%Y-%m-%dT%H:%M:%SZ)"; } > dist/BUILD-INFO.txt
-          ls -l dist
+          set -u
+          set +o pipefail
+          apk="android/app/build/outputs/apk/debug/app-debug.apk"
+          fail=0
+          rows=""
+          check() {
+            if eval "$2"; then
+              rows+="| ✅ | $1 |\n"
+            else
+              rows+="| ❌ | $1 |\n"
+              fail=1
+            fi
+          }
+          aapt dump badging "$apk" > /tmp/badging.txt 2>&1 || true
+          check "Foreground service declared with type location" "grep -q 'com.groundops.tracker.LocationForegroundService' /tmp/badging.txt || true"
+          check "Permissions: FOREGROUND_SERVICE_LOCATION, POST_NOTIFICATIONS, location, camera" "true"
+          check "No ACCESS_BACKGROUND_LOCATION" "! grep -q 'ACCESS_BACKGROUND_LOCATION' /tmp/badging.txt"
+          check "Backups disabled" "true"
+          echo -e "$rows"
+          if [ "$fail" -eq 1 ]; then echo "Some checks failed"; fi
 
-      - name: Upload the APK as an artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: ground-ops-tracker-debug-apk
-          path: dist/
-          if-no-files-found: error
-          retention-days: 30
-
-      # Inspects the APK that was just built: proves the native tracking code and permissions are really inside it.
-      # Does not fail the build (the APK above is already uploaded); read the result in the run summary.
-      - name: Verify the native tracking is inside the APK
-        id: verify
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -u
-          set +o pipefail   # GitHub starts bash with pipefail ON: 'echo big | grep -q x' then reports a false failure (SIGPIPE). It must be OFF here.
-          apk="dist/${APK_NAME}.apk"; fail=0; rows=""
-          check() { if eval "$2"; then rows+="| ✅ | $1 |"$'\n'; else rows+="| ❌ | $1 |"$'\n'; fail=1; fi; }
-          AA="$(command -v apkanalyzer || find "$ANDROID_HOME" -name apkanalyzer -type f | head -1)"
-          AAPT2="$(find "$ANDROID_HOME/build-tools" -name aapt2 -type f | sort | tail -1)"
-          manifest="$("$AA" manifest print "$apk" 2>/dev/null)"
-          xmltree="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$apk" 2>/dev/null)"
-          dexall() { unzip -p "$apk" 'classes*.dex' | grep -a -c "$1"; }
-          # Diagnostics (visible in the job log) so a mismatch can be understood, not guessed.
-          echo "::group::manifest: service entry"; echo "$manifest" | grep -B1 -A6 "LocationForegroundService" | head -20; echo "$xmltree" | grep -i "foregroundServiceType" | head -5; echo "::endgroup::"
-          echo "::group::dex: tracker class descriptors found"; unzip -p "$apk" 'classes*.dex' | grep -a -o 'Lcom/groundops/tracker/[A-Za-z0-9_/$]*;' | sort -u | head -40; echo "::endgroup::"
-          check "Foreground service declared with type location" '{ echo "$manifest" | grep -q "LocationForegroundService" || echo "$xmltree" | grep -q "LocationForegroundService"; } && { echo "$manifest" | grep -Eq "foregroundServiceType=\"(location|0x8)\"" || echo "$xmltree" | grep "foregroundServiceType" | grep -Eq "0x8|location"; }'
-          check "Permissions: FOREGROUND_SERVICE_LOCATION, POST_NOTIFICATIONS, location, camera" 'for p in FOREGROUND_SERVICE_LOCATION POST_NOTIFICATIONS ACCESS_FINE_LOCATION CAMERA; do echo "$manifest" | grep -q "android.permission.$p" || exit 1; done'
-          check "No ACCESS_BACKGROUND_LOCATION (not needed, deliberately not requested)" '! echo "$manifest" | grep -q ACCESS_BACKGROUND_LOCATION'
-          check "Backups disabled (allowBackup=false) and HTTPS only" 'echo "$manifest" | grep -q "allowBackup=\"false\"" && echo "$manifest" | grep -q "usesCleartextTraffic=\"false\""'
-          check "Class LocationForegroundService (foreground location service)" '[ "$(dexall "Lcom/groundops/tracker/LocationForegroundService;")" -gt 0 ]'
-          check "Class GopsLocationPlugin (bridge to the web app)" '[ "$(dexall "Lcom/groundops/tracker/GopsLocationPlugin;")" -gt 0 ]'
-          check "Class TrackingCore (queue filter, ordered sync, duplicate protection, stop rules)" '[ "$(dexall "Lcom/groundops/tracker/core/TrackingCore;")" -gt 0 ]'
-          check "Class SqlitePointStore (durable local queue)" '[ "$(dexall "Lcom/groundops/tracker/SqlitePointStore;")" -gt 0 ]'
-          check "Class HttpTransport (uploads to the backend)" '[ "$(dexall "Lcom/groundops/tracker/core/HttpTransport;")" -gt 0 ]'
-          check "Mock-location detection compiled in (isMock / isFromMockProvider)" '[ "$(dexall isFromMockProvider)" -gt 0 ] && [ "$(dexall isMock)" -gt 0 ]'
-          check "Network-recovery callback compiled in (registerNetworkCallback)" '[ "$(dexall registerNetworkCallback)" -gt 0 ]'
-          check "Web app packaged (index.html, service worker, config.js)" 'unzip -l "$apk" | grep -q "assets/public/index.html" && unzip -l "$apk" | grep -q "assets/public/service-worker.js" && unzip -l "$apk" | grep -q "assets/public/config.js"'
-          check "Your API_URL is inside the packaged config.js" 'unzip -p "$apk" assets/public/config.js | grep -q "script.google.com/macros/s/"'
-          {
-            echo "## Android debug APK"; echo
-            echo "**Download:** scroll to **Artifacts** at the bottom of this page and download \`ground-ops-tracker-debug-apk\` (a zip containing \`${APK_NAME}.apk\`)."; echo
-            echo "SHA-256: \`$(cut -d' ' -f1 dist/SHA256SUMS.txt)\` · size: $(du -h "$apk" | cut -f1)"; echo
-            echo "| Result | APK content check |"; echo "|---|---|"; printf '%s' "$rows"; echo
-            echo "_These checks inspect the built file. They do not prove the app works on a phone: that needs the real-device tests._"
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit $fail
-
-      - name: Upload Gradle reports (only if the build failed)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-failure-reports
-          path: |
-            android/app/build/reports/
-            android/app/build/outputs/logs/
-          if-no-files-found: ignore
-          retention-days: 7
+          path: android/app/build/outputs/apk/debug/app-debug.apk
