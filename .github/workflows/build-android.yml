@@ -2,8 +2,6 @@ name: Build Android APK
 
 on:
   workflow_dispatch:
-  # push:
-  #   branches: [ main ]
 
 jobs:
   build:
@@ -50,43 +48,29 @@ jobs:
       - name: Capacitor sync
         run: npx cap sync android
 
-      # ============ STABLE DEBUG KEYSTORE ============
-      # Cache the debug keystore so every build uses the same signature.
-      - name: Cache debug keystore
-        id: keystore-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: gops-debug-keystore-v1
-
-      - name: Generate debug keystore if missing
+      - name: Decode release keystore
         run: |
-          mkdir -p ~/.android
-          if [ ! -f ~/.android/debug.keystore ]; then
-            echo "Generating a fresh debug keystore..."
-            keytool -genkeypair -v \
-              -keystore ~/.android/debug.keystore \
-              -storepass android \
-              -keypass android \
-              -alias androiddebugkey \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
-          else
-            echo "Debug keystore already cached."
-          fi
-          ls -la ~/.android/
-      # ================================================
+          mkdir -p ~/release
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > ~/release/release.keystore
+          ls -la ~/release/
 
-      - name: Build debug APK
+      - name: Build signed release APK
         working-directory: android
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file=$HOME/release/release.keystore \
+            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+
+      - name: Rename APK
+        run: |
+          mv android/app/build/outputs/apk/release/app-release.apk \
+             android/app/build/outputs/apk/release/ground-ops-tracker-release.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ground-ops-tracker-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: ground-ops-tracker-release-apk
+          path: android/app/build/outputs/apk/release/ground-ops-tracker-release.apk
