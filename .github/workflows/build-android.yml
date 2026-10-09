@@ -42,7 +42,7 @@ jobs:
           java -version
 
       - name: Install Node dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Build web/PWA
         run: node tools/build-pwa.js || true
