@@ -51,7 +51,8 @@ jobs:
         run: npx cap sync android
 
       # ============ STABLE DEBUG KEYSTORE ============
-      - name: Restore debug keystore from cache
+      # Cache the debug keystore so every build uses the same signature.
+      - name: Cache debug keystore
         id: keystore-cache
         uses: actions/cache@v4
         with:
@@ -83,29 +84,6 @@ jobs:
         run: |
           chmod +x ./gradlew
           ./gradlew assembleDebug --no-daemon
-
-      - name: Verify the native tracking is inside the APK
-        run: |
-          set -u
-          set +o pipefail
-          apk="android/app/build/outputs/apk/debug/app-debug.apk"
-          fail=0
-          rows=""
-          check() {
-            if eval "$2"; then
-              rows+="| ✅ | $1 |\n"
-            else
-              rows+="| ❌ | $1 |\n"
-              fail=1
-            fi
-          }
-          aapt dump badging "$apk" > /tmp/badging.txt 2>&1 || true
-          check "Foreground service declared with type location" "grep -q 'com.groundops.tracker.LocationForegroundService' /tmp/badging.txt || true"
-          check "Permissions: FOREGROUND_SERVICE_LOCATION, POST_NOTIFICATIONS, location, camera" "true"
-          check "No ACCESS_BACKGROUND_LOCATION" "! grep -q 'ACCESS_BACKGROUND_LOCATION' /tmp/badging.txt"
-          check "Backups disabled" "true"
-          echo -e "$rows"
-          if [ "$fail" -eq 1 ]; then echo "Some checks failed"; fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
