@@ -1,23 +1,22 @@
 /**
- * Ground OPS - Delivery 19
- * App update checker. Runs on the employee app.
- * Compares the installed version with the server's latest version.
- * If newer, shows a top banner with a Download button.
- * Employee page only.
+ * Ground OPS - Delivery 19 v2
+ * App update checker with fast polling.
+ *   - Checks on EVERY app open.
+ *   - Checks every 15 minutes while the app is open.
+ *   - Checks when the app comes back to the foreground.
+ *   - Admin can bump the version → app picks it up in ≤15 min.
  */
 (function () {
   'use strict';
 
   if (/admin\.html/i.test(window.location.pathname)) return;
 
-  // ---------- IMPORTANT ----------
-  // Update this constant each time you rebuild the APK.
-  // It must match the "version" you enter in the Admin Settings.
+  // ---- IMPORTANT: update this constant when you build a new APK ----
   var INSTALLED_VERSION = '1.0.1';
 
   var API_URL = null;
-  var CHECK_INTERVAL_MS = 6 * 3600 * 1000; // 6 hours
-  var DISMISS_MS = 24 * 3600 * 1000;       // 24 hours
+  var CHECK_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+  var DISMISS_MS = 24 * 3600 * 1000;
   var LAST_CHECK_KEY = 'gops.app.last_check';
   var DISMISS_V_KEY = 'gops.app.dismissed_v';
   var DISMISS_T_KEY = 'gops.app.dismissed_at';
@@ -46,13 +45,6 @@
     return 0;
   }
 
-  function shouldCheck() {
-    try {
-      var last = parseInt(localStorage.getItem(LAST_CHECK_KEY) || '0', 10);
-      return (Date.now() - last) >= CHECK_INTERVAL_MS;
-    } catch (e) { return true; }
-  }
-
   function wasDismissed(v) {
     try {
       var dv = localStorage.getItem(DISMISS_V_KEY);
@@ -66,15 +58,6 @@
       localStorage.setItem(DISMISS_V_KEY, v);
       localStorage.setItem(DISMISS_T_KEY, String(Date.now()));
     } catch (e) {}
-  }
-
-  function toast(msg, bg) {
-    var el = document.createElement('div');
-    el.textContent = msg;
-    el.style.cssText = 'position:fixed;z-index:999999;left:50%;transform:translateX(-50%);top:24px;background:' + (bg || '#1e8e3e') + ';color:#fff;padding:12px 20px;border-radius:12px;font:600 14px system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:90vw;text-align:center;';
-    document.body.appendChild(el);
-    setTimeout(function () { el.style.opacity = '0'; el.style.transition = 'opacity .4s'; }, 3500);
-    setTimeout(function () { try { el.remove(); } catch (e) {} }, 4000);
   }
 
   function showBanner(version, url, notes) {
@@ -110,8 +93,14 @@
     banner.querySelector('#gops-upd-x').onclick = dismiss;
   }
 
-  function check() {
-    if (!shouldCheck()) return;
+  function check(force) {
+    // On manual call (force=true) always check; otherwise respect the interval
+    if (!force) {
+      try {
+        var last = parseInt(localStorage.getItem(LAST_CHECK_KEY) || '0', 10);
+        if ((Date.now() - last) < CHECK_INTERVAL_MS) return;
+      } catch (e) {}
+    }
     loadConfig().then(function () {
       if (!API_URL) return;
       fetch(API_URL, {
@@ -137,11 +126,14 @@
     });
   }
 
-  // Run 4 seconds after the app opens
-  setTimeout(check, 4000);
+  // 1) On app open (after 3 seconds)
+  setTimeout(function () { check(true); }, 3000);
 
-  // Also re-check when the user returns to the app
+  // 2) While the app is open: check every 15 minutes
+  setInterval(function () { check(true); }, CHECK_INTERVAL_MS);
+
+  // 3) When the user returns to the app
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) setTimeout(check, 1500);
+    if (!document.hidden) setTimeout(function () { check(true); }, 1500);
   });
 })();
