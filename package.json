@@ -26,5 +26,6 @@
     "@capacitor/android": "^6.2.0",
     "@capacitor/cli": "^8.5.2",
     "@capacitor/core": "^6.2.0"
+    "@capacitor/app": "^6.0.0",
   }
 }
