@@ -2,7 +2,7 @@
   "name": "ground-ops-tracker",
   "version": "1.0.0-batch2",
   "private": true,
-  "description": "Ground OPS Tracker - field operations attendance & geofence tracking (Batch 1 backend + Batch 2 PWA/admin frontend)",
+  "description": "Ground OPS Tracker - field operations attendance & geofence tracking",
   "scripts": {
     "test": "node tests/run.js",
     "e2e": "python3 tests/e2e/run_e2e.py",
@@ -16,16 +16,15 @@
     "test:native": "node tests/native/run-native.js"
   },
   "devDependencies": {
-    "jsdom": "^24.1.0",
-    "@capacitor/cli": "^6.2.0"
+    "@capacitor/cli": "^6.2.0",
+    "jsdom": "^24.1.0"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.0",
-    "@capacitor/cli": "^8.5.2",
-    "@capacitor/core": "^6.2.0"
     "@capacitor/app": "^6.0.0",
+    "@capacitor/core": "^6.2.0"
   }
 }
