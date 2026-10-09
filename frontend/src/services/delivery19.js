@@ -12,7 +12,7 @@
   if (/admin\.html/i.test(window.location.pathname)) return;
 
   // ---- IMPORTANT: update this constant when you build a new APK ----
-  var INSTALLED_VERSION = '1.0.1';
+  var INSTALLED_VERSION = '1.0.3';
 
   var API_URL = null;
   var CHECK_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
