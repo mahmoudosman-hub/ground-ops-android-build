@@ -1,7 +1,6 @@
 /**
- * Ground OPS - Delivery 20
- * Auto Scheduler UI for admin dashboard.
- * Full-page overlay with: Coverage, Constraints, Settings, Generate, Preview, Drafts.
+ * Ground OPS - Delivery 20 v2
+ * Auto Scheduler UI with clickable multi-select for constraints.
  */
 (function () {
   'use strict';
@@ -66,7 +65,7 @@
     setTimeout(function () { try { el.remove(); } catch (e) {} }, 3500);
   }
 
-  // ---------- Global cache for branches/shifts ----------
+  // ---------- Global cache ----------
   var _cache = { branches: null, shifts: null, employees: null };
   function getBranches() {
     if (_cache.branches) return Promise.resolve(_cache.branches);
@@ -81,7 +80,7 @@
     return call('getEmployees', { page_size: 500 }).then(function (d) { _cache.employees = d.items || []; return _cache.employees; });
   }
 
-  // ---------- Open the full-page Auto Scheduler ----------
+  // ---------- Open page ----------
   function openAutoScheduler() {
     var old = document.getElementById('gops-auto-sched-root');
     if (old) old.remove();
@@ -96,7 +95,7 @@
         '</div>' +
         '<button id="gops-sch-close" style="padding:10px 18px;border:0;border-radius:8px;background:#111;color:#fff;cursor:pointer;font-weight:700">Close</button>' +
       '</div>' +
-      '<div style="display:flex;border-bottom:1px solid #e3e6ea;background:#fff;padding:0 24px;position:sticky;top:73px;z-index:4">' +
+      '<div style="display:flex;border-bottom:1px solid #e3e6ea;background:#fff;padding:0 24px;position:sticky;top:73px;z-index:4;overflow-x:auto">' +
         tabBtn('coverage', '🏢 Coverage', true) +
         tabBtn('constraints', '🚫 Constraints', false) +
         tabBtn('settings', '⚙️ Settings', false) +
@@ -116,7 +115,7 @@
   function tabBtn(key, label, active) {
     return '<button data-gops-tab="' + key + '" style="padding:14px 18px;background:transparent;border:0;border-bottom:3px solid ' +
       (active ? '#0a84ff' : 'transparent') + ';color:' + (active ? '#0a84ff' : '#555') +
-      ';font-weight:700;cursor:pointer;font-size:14px">' + label + '</button>';
+      ';font-weight:700;cursor:pointer;font-size:14px;white-space:nowrap">' + label + '</button>';
   }
 
   function activateTab(key) {
@@ -224,7 +223,7 @@
   }
 
   // ================================================================
-  // TAB 2: Constraints
+  // TAB 2: Constraints (clickable multi-select)
   // ================================================================
   function renderConstraintsTab(panel) {
     setStatus('Loading constraints...');
@@ -233,59 +232,116 @@
       var rules = data.constraints || [];
       setStatus(rules.length + ' constraint(s)');
 
-      var dayOpts = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       var empOpts = emps.map(function (e) { return '<option value="' + esc(e.employee_id) + '">' + esc(e.employee_name) + ' (' + esc(e.employee_id) + ')</option>'; }).join('');
+      var dayList = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+      // Pre-build the days/branches/shifts pickers
+      var daysPicker = dayList.map(function (d) {
+        return '<label style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #e0e3e7;border-radius:8px;margin:3px;cursor:pointer;font-size:13px;background:#fafbfc"><input type="checkbox" data-day="' + d + '"> ' + d + '</label>';
+      }).join('');
+
+      var branchesPicker = branches.map(function (b) {
+        return '<label style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #e0e3e7;border-radius:8px;margin:3px;cursor:pointer;font-size:13px;background:#fafbfc"><input type="checkbox" data-branch="' + esc(b.branch_id) + '"> ' + esc(b.branch_name) + '</label>';
+      }).join('');
+
+      var shiftsPicker = shifts.map(function (s) {
+        return '<label style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #e0e3e7;border-radius:8px;margin:3px;cursor:pointer;font-size:13px;background:#fafbfc"><input type="checkbox" data-shift="' + esc(s.shift_id) + '"> ' + esc(s.shift_name) + ' (' + esc(s.start_time) + '-' + esc(s.end_time) + ')</label>';
+      }).join('');
 
       panel.innerHTML =
         '<div style="background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)">' +
           '<h2 style="margin:0 0 6px;font-size:16px">Add captain constraint</h2>' +
-          '<p style="color:#666;margin:0 0 14px;font-size:13px">Mark days, branches, or shifts a captain can never be assigned to.</p>' +
-          '<div style="display:grid;grid-template-columns:1fr;gap:12px">' +
-            '<label><span style="display:block;font-weight:600;font-size:12px;margin-bottom:4px">Captain</span>' +
-              '<select id="gops-cons-emp" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px">' + empOpts + '</select></label>' +
-            '<label><span style="display:block;font-weight:600;font-size:12px;margin-bottom:4px">Forbidden days (comma-separated or empty)</span>' +
-              '<input id="gops-cons-days" placeholder="e.g. Friday,Saturday" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px"></label>' +
-            '<label><span style="display:block;font-weight:600;font-size:12px;margin-bottom:4px">Forbidden branches (IDs, comma-separated or empty)</span>' +
-              '<input id="gops-cons-branches" placeholder="e.g. BR-XXX,BR-YYY" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px"></label>' +
-            '<label><span style="display:block;font-weight:600;font-size:12px;margin-bottom:4px">Forbidden shifts (IDs, comma-separated or empty)</span>' +
-              '<input id="gops-cons-shifts" placeholder="e.g. SH-XXX,SH-YYY" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px"></label>' +
-            '<label><span style="display:block;font-weight:600;font-size:12px;margin-bottom:4px">Notes (optional)</span>' +
-              '<input id="gops-cons-notes" placeholder="Reason" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px"></label>' +
-            '<div><button id="gops-cons-add" style="padding:11px 24px;border:0;border-radius:8px;background:#0a84ff;color:#fff;font-weight:700;cursor:pointer">+ Add constraint</button></div>' +
+          '<p style="color:#666;margin:0 0 18px;font-size:13px">Pick the days, branches, or shifts this captain can never be assigned to. Click to select.</p>' +
+
+          '<label style="display:block;margin-bottom:16px">' +
+            '<span style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">Captain</span>' +
+            '<select id="gops-cons-emp" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px">' + empOpts + '</select>' +
+          '</label>' +
+
+          '<div style="margin-bottom:16px">' +
+            '<span style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">🗓️ Forbidden days (optional)</span>' +
+            '<div id="gops-cons-days-picker" style="display:flex;flex-wrap:wrap">' + daysPicker + '</div>' +
+          '</div>' +
+
+          '<div style="margin-bottom:16px">' +
+            '<span style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">🏢 Forbidden branches (optional)</span>' +
+            '<div id="gops-cons-branches-picker" style="display:flex;flex-wrap:wrap">' + branchesPicker + '</div>' +
+          '</div>' +
+
+          '<div style="margin-bottom:16px">' +
+            '<span style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">⏰ Forbidden shifts (optional)</span>' +
+            '<div id="gops-cons-shifts-picker" style="display:flex;flex-wrap:wrap">' + shiftsPicker + '</div>' +
+          '</div>' +
+
+          '<label style="display:block;margin-bottom:16px">' +
+            '<span style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">Notes (optional)</span>' +
+            '<input id="gops-cons-notes" placeholder="Reason (e.g., student, medical, etc.)" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box">' +
+          '</label>' +
+
+          '<div style="display:flex;gap:10px">' +
+            '<button id="gops-cons-add" style="padding:11px 24px;border:0;border-radius:8px;background:#0a84ff;color:#fff;font-weight:700;cursor:pointer">+ Add constraint</button>' +
+            '<button id="gops-cons-clear" style="padding:11px 20px;border:1px solid #ccc;border-radius:8px;background:#fff;font-weight:700;cursor:pointer">Clear selection</button>' +
           '</div>' +
         '</div>' +
+
         '<div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)">' +
+          '<div style="padding:14px 18px;background:#f5f7fa;border-bottom:1px solid #eef1f4;font-weight:700;font-size:14px">' +
+            'Current constraints (' + rules.length + ')' +
+          '</div>' +
           (rules.length ?
-            '<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f5f7fa">' +
-              '<th style="text-align:left;padding:12px">Captain</th>' +
-              '<th style="text-align:left;padding:12px">Days</th>' +
-              '<th style="text-align:left;padding:12px">Branches</th>' +
-              '<th style="text-align:left;padding:12px">Shifts</th>' +
-              '<th style="text-align:left;padding:12px">Notes</th>' +
-              '<th style="padding:12px"></th>' +
-            '</tr></thead><tbody>' +
+            '<div>' +
               rules.map(function (r) {
                 var e = emps.filter(function (x) { return x.employee_id === r.employee_id; })[0];
-                return '<tr style="border-bottom:1px solid #eef1f4">' +
-                  '<td style="padding:12px">' + esc(e ? e.employee_name : r.employee_id) + '</td>' +
-                  '<td style="padding:12px">' + esc(r.forbidden_days || '—') + '</td>' +
-                  '<td style="padding:12px">' + esc(r.forbidden_branches || '—') + '</td>' +
-                  '<td style="padding:12px">' + esc(r.forbidden_shifts || '—') + '</td>' +
-                  '<td style="padding:12px;color:#666">' + esc(r.notes || '') + '</td>' +
-                  '<td style="padding:12px;text-align:right"><button data-del-cons="' + esc(r.constraint_id) + '" style="padding:6px 12px;border:0;border-radius:6px;background:#fde8e8;color:#c0392b;font-weight:700;cursor:pointer">Delete</button></td>' +
-                '</tr>';
+                var fDays = (r.forbidden_days || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+                var fBrs = (r.forbidden_branches || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+                var fShs = (r.forbidden_shifts || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+                var branchesTags = fBrs.map(function (id) {
+                  var b = branches.filter(function (x) { return x.branch_id === id; })[0];
+                  return '<span style="display:inline-block;padding:3px 8px;background:#e7f0ff;color:#0a84ff;border-radius:6px;margin:2px;font-size:12px">🏢 ' + esc(b ? b.branch_name : id) + '</span>';
+                }).join('');
+                var shiftsTags = fShs.map(function (id) {
+                  var s = shifts.filter(function (x) { return x.shift_id === id; })[0];
+                  return '<span style="display:inline-block;padding:3px 8px;background:#fff3cd;color:#856404;border-radius:6px;margin:2px;font-size:12px">⏰ ' + esc(s ? (s.shift_name + ' ' + s.start_time + '-' + s.end_time) : id) + '</span>';
+                }).join('');
+                var daysTags = fDays.map(function (d) { return '<span style="display:inline-block;padding:3px 8px;background:#fde8e8;color:#c0392b;border-radius:6px;margin:2px;font-size:12px">🗓️ ' + esc(d) + '</span>'; }).join('');
+                return '<div style="padding:14px 18px;border-bottom:1px solid #eef1f4">' +
+                  '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">' +
+                    '<div style="flex:1">' +
+                      '<div style="font-weight:700;margin-bottom:6px">' + esc(e ? e.employee_name : r.employee_id) + ' <span style="color:#999;font-weight:400;font-size:12px">(' + esc(r.employee_id) + ')</span></div>' +
+                      '<div>' + (daysTags || branchesTags || shiftsTags ? (daysTags + branchesTags + shiftsTags) : '<span style="color:#999">No restrictions</span>') + '</div>' +
+                      (r.notes ? '<div style="color:#666;font-size:12px;margin-top:6px">📝 ' + esc(r.notes) + '</div>' : '') +
+                    '</div>' +
+                    '<button data-del-cons="' + esc(r.constraint_id) + '" style="padding:6px 12px;border:0;border-radius:6px;background:#fde8e8;color:#c0392b;font-weight:700;cursor:pointer">Delete</button>' +
+                  '</div>' +
+                '</div>';
               }).join('') +
-            '</tbody></table>'
+            '</div>'
             : '<div style="padding:30px;color:#666;text-align:center">No constraints yet.</div>') +
         '</div>';
 
+      function getSelectedDays() {
+        return Array.prototype.slice.call(panel.querySelectorAll('#gops-cons-days-picker input[type=checkbox]:checked')).map(function (c) { return c.getAttribute('data-day'); });
+      }
+      function getSelectedBranches() {
+        return Array.prototype.slice.call(panel.querySelectorAll('#gops-cons-branches-picker input[type=checkbox]:checked')).map(function (c) { return c.getAttribute('data-branch'); });
+      }
+      function getSelectedShifts() {
+        return Array.prototype.slice.call(panel.querySelectorAll('#gops-cons-shifts-picker input[type=checkbox]:checked')).map(function (c) { return c.getAttribute('data-shift'); });
+      }
+
+      panel.querySelector('#gops-cons-clear').onclick = function () {
+        panel.querySelectorAll('#gops-cons-days-picker input, #gops-cons-branches-picker input, #gops-cons-shifts-picker input').forEach(function (c) { c.checked = false; });
+        panel.querySelector('#gops-cons-notes').value = '';
+      };
+
       panel.querySelector('#gops-cons-add').onclick = function () {
         var emp = panel.querySelector('#gops-cons-emp').value;
-        var days = panel.querySelector('#gops-cons-days').value.trim();
-        var brs = panel.querySelector('#gops-cons-branches').value.trim();
-        var shs = panel.querySelector('#gops-cons-shifts').value.trim();
+        var days = getSelectedDays().join(',');
+        var brs = getSelectedBranches().join(',');
+        var shs = getSelectedShifts().join(',');
         var notes = panel.querySelector('#gops-cons-notes').value.trim();
         if (!emp) { toast('Select a captain', '#c0392b'); return; }
+        if (!days && !brs && !shs) { toast('Select at least one restriction', '#c0392b'); return; }
         setStatus('Saving...');
         call('saveConstraint', { employee_id: emp, forbidden_days: days, forbidden_branches: brs, forbidden_shifts: shs, notes: notes })
           .then(function () { toast('Constraint saved'); activateTab('constraints'); })
@@ -309,7 +365,7 @@
   }
 
   // ================================================================
-  // TAB 3: Settings (sched_* only)
+  // TAB 3: Settings
   // ================================================================
   function renderSettingsTab(panel) {
     setStatus('Loading settings...');
@@ -365,15 +421,15 @@
   }
 
   // ================================================================
-  // TAB 4: Generate + Preview
+  // TAB 4: Generate
   // ================================================================
-  function renderGenerateTab(panel, existingDraft) {
+  function renderGenerateTab(panel) {
     var today = new Date().toISOString().slice(0, 10);
     var weekLater = new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10);
     panel.innerHTML =
       '<div style="background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)">' +
         '<h2 style="margin:0 0 6px;font-size:16px">Generate a new schedule draft</h2>' +
-        '<p style="color:#666;margin:0 0 14px;font-size:13px">The scheduler will read existing leaves, constraints, and coverage rules, then build a full week.</p>' +
+        '<p style="color:#666;margin:0 0 14px;font-size:13px">The scheduler reads leaves, constraints, and coverage rules, then builds a full week.</p>' +
         '<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end">' +
           '<label><span style="display:block;font-weight:600;font-size:12px;margin-bottom:4px">From</span>' +
             '<input type="date" id="gops-gen-from" value="' + today + '" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px"></label>' +
@@ -404,7 +460,6 @@
   function renderDraftPreview(container, draft) {
     var warnings = draft.warnings || [];
     var stats = draft.stats || [];
-    var dailySummary = draft.daily_summary || {};
     var assignments = draft.assignments || [];
 
     var html =
@@ -422,7 +477,7 @@
           '</div>' +
         '</div>' +
       '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">' +
         card('Total assignments', assignments.length, '#0a84ff') +
         card('Warnings', warnings.length, warnings.length ? '#c0392b' : '#1e8e3e') +
         card('Captains scheduled', stats.filter(function (s) { return s.shifts > 0; }).length + ' / ' + stats.length, '#6c5ce7') +
@@ -434,11 +489,11 @@
         '</div>' : '') +
       '<div style="background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)">' +
         '<h3 style="margin:0 0 12px;font-size:15px">Captain stats</h3>' +
-        '<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f5f7fa">' +
+        '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f5f7fa">' +
           '<th style="text-align:left;padding:10px">Captain</th>' +
           '<th style="text-align:left;padding:10px">Shifts</th>' +
           '<th style="text-align:left;padding:10px">Hours</th>' +
-          '<th style="text-align:left;padding:10px">Min shifts OK</th>' +
+          '<th style="text-align:left;padding:10px">Min OK</th>' +
         '</tr></thead><tbody>' +
           stats.map(function (s) {
             return '<tr style="border-bottom:1px solid #eef1f4">' +
@@ -448,11 +503,11 @@
               '<td style="padding:10px">' + (s.min_ok ? '✅' : '⚠️') + '</td>' +
             '</tr>';
           }).join('') +
-        '</tbody></table>' +
+        '</tbody></table></div>' +
       '</div>' +
       '<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06)">' +
         '<h3 style="margin:0 0 12px;font-size:15px">Assignments preview (first 40)</h3>' +
-        '<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f5f7fa">' +
+        '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f5f7fa">' +
           '<th style="text-align:left;padding:10px">Date</th>' +
           '<th style="text-align:left;padding:10px">Captain</th>' +
           '<th style="text-align:left;padding:10px">Branch</th>' +
@@ -466,15 +521,13 @@
               '<td style="padding:10px">' + esc(a.shift_id) + '</td>' +
             '</tr>';
           }).join('') +
-        '</tbody></table>' +
+        '</tbody></table></div>' +
         (assignments.length > 40 ? '<div style="color:#666;font-size:12px;margin-top:8px">Showing 40 of ' + assignments.length + '</div>' : '') +
       '</div>';
 
     container.innerHTML = html;
 
-    container.querySelector('#gops-draft-regen').onclick = function () {
-      activateTab('generate');
-    };
+    container.querySelector('#gops-draft-regen').onclick = function () { activateTab('generate'); };
     container.querySelector('#gops-draft-publish').onclick = function () {
       if (!confirm('Publish this draft? This will create real assignments in the system.')) return;
       setStatus('Publishing...');
@@ -493,7 +546,7 @@
   }
 
   // ================================================================
-  // TAB 5: Drafts (history)
+  // TAB 5: Drafts
   // ================================================================
   function renderDraftsTab(panel) {
     setStatus('Loading drafts...');
@@ -503,7 +556,7 @@
       panel.innerHTML =
         '<div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)">' +
           (drafts.length ?
-            '<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f5f7fa">' +
+            '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f5f7fa">' +
               '<th style="text-align:left;padding:12px">ID</th>' +
               '<th style="text-align:left;padding:12px">Week</th>' +
               '<th style="text-align:left;padding:12px">Status</th>' +
@@ -521,7 +574,7 @@
                   '</td>' +
                 '</tr>';
               }).join('') +
-            '</tbody></table>'
+            '</tbody></table></div>'
             : '<div style="padding:30px;color:#666;text-align:center">No drafts yet. Generate one from the Generate tab.</div>') +
         '</div>';
 
@@ -539,8 +592,7 @@
               week_to: d.draft.week_to,
               assignments: d.draft.assignments || [],
               warnings: d.draft.warnings || [],
-              stats: d.draft.stats || [],
-              daily_summary: {}
+              stats: d.draft.stats || []
             });
             setStatus('Draft ' + id, '#0a84ff');
           }).catch(function (e) { toast(e.message || e.code, '#c0392b'); });
@@ -552,7 +604,7 @@
   }
 
   // ================================================================
-  // Sidebar injection
+  // Sidebar
   // ================================================================
   function findSidebar() {
     var sels = ['.sidebar', 'nav.sidebar', 'aside.sidebar', '#sidebar', '.sidenav', '.side-nav', 'aside', 'nav[role="navigation"]'];
