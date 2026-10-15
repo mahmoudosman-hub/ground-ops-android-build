@@ -1,6 +1,6 @@
 /**
- * Ground OPS - Delivery 20 v2
- * Auto Scheduler UI with clickable multi-select for constraints.
+ * Ground OPS - Delivery 20 v3
+ * Auto Scheduler UI with names instead of IDs + real weekly grid.
  */
 (function () {
   'use strict';
@@ -65,7 +65,7 @@
     setTimeout(function () { try { el.remove(); } catch (e) {} }, 3500);
   }
 
-  // ---------- Global cache ----------
+  // ---------- Caches ----------
   var _cache = { branches: null, shifts: null, employees: null };
   function getBranches() {
     if (_cache.branches) return Promise.resolve(_cache.branches);
@@ -78,6 +78,26 @@
   function getEmployees() {
     if (_cache.employees) return Promise.resolve(_cache.employees);
     return call('getEmployees', { page_size: 500 }).then(function (d) { _cache.employees = d.items || []; return _cache.employees; });
+  }
+  function branchName(id) {
+    if (!_cache.branches) return id;
+    var b = _cache.branches.filter(function (x) { return x.branch_id === id; })[0];
+    return b ? b.branch_name : id;
+  }
+  function shiftName(id) {
+    if (!_cache.shifts) return id;
+    var s = _cache.shifts.filter(function (x) { return x.shift_id === id; })[0];
+    return s ? (s.shift_name + ' ' + s.start_time + '-' + s.end_time) : id;
+  }
+  function shiftShort(id) {
+    if (!_cache.shifts) return id;
+    var s = _cache.shifts.filter(function (x) { return x.shift_id === id; })[0];
+    return s ? (s.start_time + '-' + s.end_time) : id;
+  }
+  function empName(id) {
+    if (!_cache.employees) return id;
+    var e = _cache.employees.filter(function (x) { return x.employee_id === id; })[0];
+    return e ? e.employee_name : id;
   }
 
   // ---------- Open page ----------
@@ -102,7 +122,7 @@
         tabBtn('generate', '🆕 Generate', false) +
         tabBtn('drafts', '📂 Drafts', false) +
       '</div>' +
-      '<div id="gops-sch-panel" style="padding:24px;max-width:1400px;margin:0 auto"></div>';
+      '<div id="gops-sch-panel" style="padding:24px;max-width:1600px;margin:0 auto"></div>';
     document.body.appendChild(root);
 
     root.querySelector('#gops-sch-close').onclick = function () { root.remove(); };
@@ -128,11 +148,16 @@
     });
     var p = root.querySelector('#gops-sch-panel');
     p.innerHTML = '<div style="padding:20px;color:#666">Loading...</div>';
-    if (key === 'coverage') renderCoverageTab(p);
-    else if (key === 'constraints') renderConstraintsTab(p);
-    else if (key === 'settings') renderSettingsTab(p);
-    else if (key === 'generate') renderGenerateTab(p);
-    else if (key === 'drafts') renderDraftsTab(p);
+    // Always preload the caches first so names render correctly
+    Promise.all([getBranches(), getShifts(), getEmployees()]).then(function () {
+      if (key === 'coverage') renderCoverageTab(p);
+      else if (key === 'constraints') renderConstraintsTab(p);
+      else if (key === 'settings') renderSettingsTab(p);
+      else if (key === 'generate') renderGenerateTab(p);
+      else if (key === 'drafts') renderDraftsTab(p);
+    }).catch(function (e) {
+      p.innerHTML = '<div style="padding:20px;color:#c0392b">Error: ' + esc(e.message) + '</div>';
+    });
   }
 
   function setStatus(txt, color) {
@@ -145,8 +170,9 @@
   // ================================================================
   function renderCoverageTab(panel) {
     setStatus('Loading coverage rules...');
-    Promise.all([getBranches(), getShifts(), call('getCoverage', {})]).then(function (arr) {
-      var branches = arr[0], shifts = arr[1], data = arr[2];
+    call('getCoverage', {}).then(function (data) {
+      var branches = _cache.branches || [];
+      var shifts = _cache.shifts || [];
       var rules = data.coverage || [];
       setStatus(rules.length + ' coverage rule(s)');
 
@@ -180,11 +206,9 @@
               '<th style="padding:12px"></th>' +
             '</tr></thead><tbody>' +
               rules.map(function (r) {
-                var b = branches.filter(function (x) { return x.branch_id === r.branch_id; })[0];
-                var s = shifts.filter(function (x) { return x.shift_id === r.shift_id; })[0];
                 return '<tr style="border-bottom:1px solid #eef1f4">' +
-                  '<td style="padding:12px">' + esc(b ? b.branch_name : r.branch_id) + '</td>' +
-                  '<td style="padding:12px">' + esc(s ? s.shift_name : r.shift_id) + ' <span style="color:#999">(' + esc(s ? s.start_time + '-' + s.end_time : '') + ')</span></td>' +
+                  '<td style="padding:12px">' + esc(branchName(r.branch_id)) + '</td>' +
+                  '<td style="padding:12px">' + esc(shiftName(r.shift_id)) + '</td>' +
                   '<td style="padding:12px">' + esc(r.day_of_week || 'ALL') + '</td>' +
                   '<td style="padding:12px;font-weight:700">' + esc(r.captains_required) + '</td>' +
                   '<td style="padding:12px;text-align:right"><button data-del="' + esc(r.coverage_id) + '" style="padding:6px 12px;border:0;border-radius:6px;background:#fde8e8;color:#c0392b;font-weight:700;cursor:pointer">Delete</button></td>' +
@@ -218,24 +242,24 @@
       });
     }).catch(function (e) {
       panel.innerHTML = '<div style="padding:20px;color:#c0392b">Error: ' + esc(e.message) + '</div>';
-      setStatus('Error', '#c0392b');
     });
   }
 
   // ================================================================
-  // TAB 2: Constraints (clickable multi-select)
+  // TAB 2: Constraints
   // ================================================================
   function renderConstraintsTab(panel) {
     setStatus('Loading constraints...');
-    Promise.all([getEmployees(), getBranches(), getShifts(), call('getConstraints', {})]).then(function (arr) {
-      var emps = arr[0], branches = arr[1], shifts = arr[2], data = arr[3];
+    call('getConstraints', {}).then(function (data) {
+      var emps = _cache.employees || [];
+      var branches = _cache.branches || [];
+      var shifts = _cache.shifts || [];
       var rules = data.constraints || [];
       setStatus(rules.length + ' constraint(s)');
 
       var empOpts = emps.map(function (e) { return '<option value="' + esc(e.employee_id) + '">' + esc(e.employee_name) + ' (' + esc(e.employee_id) + ')</option>'; }).join('');
       var dayList = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-      // Pre-build the days/branches/shifts pickers
       var daysPicker = dayList.map(function (d) {
         return '<label style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #e0e3e7;border-radius:8px;margin:3px;cursor:pointer;font-size:13px;background:#fafbfc"><input type="checkbox" data-day="' + d + '"> ' + d + '</label>';
       }).join('');
@@ -251,83 +275,51 @@
       panel.innerHTML =
         '<div style="background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)">' +
           '<h2 style="margin:0 0 6px;font-size:16px">Add captain constraint</h2>' +
-          '<p style="color:#666;margin:0 0 18px;font-size:13px">Pick the days, branches, or shifts this captain can never be assigned to. Click to select.</p>' +
-
+          '<p style="color:#666;margin:0 0 18px;font-size:13px">Pick the days, branches, or shifts this captain can never be assigned to.</p>' +
           '<label style="display:block;margin-bottom:16px">' +
             '<span style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">Captain</span>' +
             '<select id="gops-cons-emp" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px">' + empOpts + '</select>' +
           '</label>' +
-
-          '<div style="margin-bottom:16px">' +
-            '<span style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">🗓️ Forbidden days (optional)</span>' +
-            '<div id="gops-cons-days-picker" style="display:flex;flex-wrap:wrap">' + daysPicker + '</div>' +
-          '</div>' +
-
-          '<div style="margin-bottom:16px">' +
-            '<span style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">🏢 Forbidden branches (optional)</span>' +
-            '<div id="gops-cons-branches-picker" style="display:flex;flex-wrap:wrap">' + branchesPicker + '</div>' +
-          '</div>' +
-
-          '<div style="margin-bottom:16px">' +
-            '<span style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">⏰ Forbidden shifts (optional)</span>' +
-            '<div id="gops-cons-shifts-picker" style="display:flex;flex-wrap:wrap">' + shiftsPicker + '</div>' +
-          '</div>' +
-
+          '<div style="margin-bottom:16px"><span style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">🗓️ Forbidden days (optional)</span>' +
+            '<div id="gops-cons-days-picker" style="display:flex;flex-wrap:wrap">' + daysPicker + '</div></div>' +
+          '<div style="margin-bottom:16px"><span style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">🏢 Forbidden branches (optional)</span>' +
+            '<div id="gops-cons-branches-picker" style="display:flex;flex-wrap:wrap">' + branchesPicker + '</div></div>' +
+          '<div style="margin-bottom:16px"><span style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">⏰ Forbidden shifts (optional)</span>' +
+            '<div id="gops-cons-shifts-picker" style="display:flex;flex-wrap:wrap">' + shiftsPicker + '</div></div>' +
           '<label style="display:block;margin-bottom:16px">' +
             '<span style="display:block;font-weight:600;font-size:13px;margin-bottom:6px">Notes (optional)</span>' +
-            '<input id="gops-cons-notes" placeholder="Reason (e.g., student, medical, etc.)" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box">' +
+            '<input id="gops-cons-notes" placeholder="Reason" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box">' +
           '</label>' +
-
           '<div style="display:flex;gap:10px">' +
             '<button id="gops-cons-add" style="padding:11px 24px;border:0;border-radius:8px;background:#0a84ff;color:#fff;font-weight:700;cursor:pointer">+ Add constraint</button>' +
             '<button id="gops-cons-clear" style="padding:11px 20px;border:1px solid #ccc;border-radius:8px;background:#fff;font-weight:700;cursor:pointer">Clear selection</button>' +
           '</div>' +
         '</div>' +
-
         '<div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)">' +
-          '<div style="padding:14px 18px;background:#f5f7fa;border-bottom:1px solid #eef1f4;font-weight:700;font-size:14px">' +
-            'Current constraints (' + rules.length + ')' +
-          '</div>' +
+          '<div style="padding:14px 18px;background:#f5f7fa;border-bottom:1px solid #eef1f4;font-weight:700;font-size:14px">Current constraints (' + rules.length + ')</div>' +
           (rules.length ?
             '<div>' +
               rules.map(function (r) {
-                var e = emps.filter(function (x) { return x.employee_id === r.employee_id; })[0];
                 var fDays = (r.forbidden_days || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
                 var fBrs = (r.forbidden_branches || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
                 var fShs = (r.forbidden_shifts || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
-                var branchesTags = fBrs.map(function (id) {
-                  var b = branches.filter(function (x) { return x.branch_id === id; })[0];
-                  return '<span style="display:inline-block;padding:3px 8px;background:#e7f0ff;color:#0a84ff;border-radius:6px;margin:2px;font-size:12px">🏢 ' + esc(b ? b.branch_name : id) + '</span>';
-                }).join('');
-                var shiftsTags = fShs.map(function (id) {
-                  var s = shifts.filter(function (x) { return x.shift_id === id; })[0];
-                  return '<span style="display:inline-block;padding:3px 8px;background:#fff3cd;color:#856404;border-radius:6px;margin:2px;font-size:12px">⏰ ' + esc(s ? (s.shift_name + ' ' + s.start_time + '-' + s.end_time) : id) + '</span>';
-                }).join('');
-                var daysTags = fDays.map(function (d) { return '<span style="display:inline-block;padding:3px 8px;background:#fde8e8;color:#c0392b;border-radius:6px;margin:2px;font-size:12px">🗓️ ' + esc(d) + '</span>'; }).join('');
+                var tags =
+                  fDays.map(function (d) { return '<span style="display:inline-block;padding:3px 8px;background:#fde8e8;color:#c0392b;border-radius:6px;margin:2px;font-size:12px">🗓️ ' + esc(d) + '</span>'; }).join('') +
+                  fBrs.map(function (id) { return '<span style="display:inline-block;padding:3px 8px;background:#e7f0ff;color:#0a84ff;border-radius:6px;margin:2px;font-size:12px">🏢 ' + esc(branchName(id)) + '</span>'; }).join('') +
+                  fShs.map(function (id) { return '<span style="display:inline-block;padding:3px 8px;background:#fff3cd;color:#856404;border-radius:6px;margin:2px;font-size:12px">⏰ ' + esc(shiftName(id)) + '</span>'; }).join('');
                 return '<div style="padding:14px 18px;border-bottom:1px solid #eef1f4">' +
                   '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">' +
                     '<div style="flex:1">' +
-                      '<div style="font-weight:700;margin-bottom:6px">' + esc(e ? e.employee_name : r.employee_id) + ' <span style="color:#999;font-weight:400;font-size:12px">(' + esc(r.employee_id) + ')</span></div>' +
-                      '<div>' + (daysTags || branchesTags || shiftsTags ? (daysTags + branchesTags + shiftsTags) : '<span style="color:#999">No restrictions</span>') + '</div>' +
+                      '<div style="font-weight:700;margin-bottom:6px">' + esc(empName(r.employee_id)) + '</div>' +
+                      '<div>' + (tags || '<span style="color:#999">No restrictions</span>') + '</div>' +
                       (r.notes ? '<div style="color:#666;font-size:12px;margin-top:6px">📝 ' + esc(r.notes) + '</div>' : '') +
                     '</div>' +
                     '<button data-del-cons="' + esc(r.constraint_id) + '" style="padding:6px 12px;border:0;border-radius:6px;background:#fde8e8;color:#c0392b;font-weight:700;cursor:pointer">Delete</button>' +
-                  '</div>' +
-                '</div>';
+                  '</div></div>';
               }).join('') +
             '</div>'
             : '<div style="padding:30px;color:#666;text-align:center">No constraints yet.</div>') +
         '</div>';
-
-      function getSelectedDays() {
-        return Array.prototype.slice.call(panel.querySelectorAll('#gops-cons-days-picker input[type=checkbox]:checked')).map(function (c) { return c.getAttribute('data-day'); });
-      }
-      function getSelectedBranches() {
-        return Array.prototype.slice.call(panel.querySelectorAll('#gops-cons-branches-picker input[type=checkbox]:checked')).map(function (c) { return c.getAttribute('data-branch'); });
-      }
-      function getSelectedShifts() {
-        return Array.prototype.slice.call(panel.querySelectorAll('#gops-cons-shifts-picker input[type=checkbox]:checked')).map(function (c) { return c.getAttribute('data-shift'); });
-      }
 
       panel.querySelector('#gops-cons-clear').onclick = function () {
         panel.querySelectorAll('#gops-cons-days-picker input, #gops-cons-branches-picker input, #gops-cons-shifts-picker input').forEach(function (c) { c.checked = false; });
@@ -336,9 +328,9 @@
 
       panel.querySelector('#gops-cons-add').onclick = function () {
         var emp = panel.querySelector('#gops-cons-emp').value;
-        var days = getSelectedDays().join(',');
-        var brs = getSelectedBranches().join(',');
-        var shs = getSelectedShifts().join(',');
+        var days = Array.prototype.slice.call(panel.querySelectorAll('#gops-cons-days-picker input:checked')).map(function (c) { return c.getAttribute('data-day'); }).join(',');
+        var brs = Array.prototype.slice.call(panel.querySelectorAll('#gops-cons-branches-picker input:checked')).map(function (c) { return c.getAttribute('data-branch'); }).join(',');
+        var shs = Array.prototype.slice.call(panel.querySelectorAll('#gops-cons-shifts-picker input:checked')).map(function (c) { return c.getAttribute('data-shift'); }).join(',');
         var notes = panel.querySelector('#gops-cons-notes').value.trim();
         if (!emp) { toast('Select a captain', '#c0392b'); return; }
         if (!days && !brs && !shs) { toast('Select at least one restriction', '#c0392b'); return; }
@@ -360,7 +352,6 @@
       });
     }).catch(function (e) {
       panel.innerHTML = '<div style="padding:20px;color:#c0392b">Error: ' + esc(e.message) + '</div>';
-      setStatus('Error', '#c0392b');
     });
   }
 
@@ -416,7 +407,6 @@
       };
     }).catch(function (e) {
       panel.innerHTML = '<div style="padding:20px;color:#c0392b">Error: ' + esc(e.message) + '</div>';
-      setStatus('Error', '#c0392b');
     });
   }
 
@@ -457,10 +447,58 @@
     };
   }
 
+  // ================================================================
+  // Preview with weekly grid + names
+  // ================================================================
   function renderDraftPreview(container, draft) {
     var warnings = draft.warnings || [];
     var stats = draft.stats || [];
     var assignments = draft.assignments || [];
+
+    // Build a lookup: empId -> work_date -> assignment
+    var byEmpDate = {};
+    assignments.forEach(function (a) {
+      if (!byEmpDate[a.employee_id]) byEmpDate[a.employee_id] = {};
+      byEmpDate[a.employee_id][a.work_date] = a;
+    });
+
+    // Unique sorted dates
+    var dateSet = {};
+    assignments.forEach(function (a) { dateSet[a.work_date] = true; });
+    var dates = Object.keys(dateSet).sort();
+
+    // Branch color palette (deterministic per branch_id)
+    var palette = ['#0a84ff', '#6c5ce7', '#e17055', '#00b894', '#f39c12', '#d63031', '#0984e3', '#a29bfe', '#fd79a8', '#00cec9'];
+    var branchColors = {};
+    (_cache.branches || []).forEach(function (b, i) {
+      branchColors[b.branch_id] = palette[i % palette.length];
+    });
+
+    // Weekly grid rows
+    var gridRows = stats.map(function (s) {
+      var cells = dates.map(function (d) {
+        var a = byEmpDate[s.employee_id] && byEmpDate[s.employee_id][d];
+        if (!a) return '<td style="padding:8px;border:1px solid #eef1f4;background:#fafbfc;text-align:center;color:#ccc;font-size:12px">—</td>';
+        var color = branchColors[a.branch_id] || '#666';
+        return '<td style="padding:8px;border:1px solid #eef1f4;background:' + color + '1a;color:' + color + ';text-align:center;font-size:12px;font-weight:600">' +
+          '<div>' + esc(branchName(a.branch_id)) + '</div>' +
+          '<div style="font-weight:400;opacity:.8;font-size:11px">' + esc(shiftShort(a.shift_id)) + '</div>' +
+        '</td>';
+      }).join('');
+      return '<tr>' +
+        '<td style="padding:10px;border:1px solid #eef1f4;background:#fafbfc;font-weight:700;position:sticky;left:0;z-index:1">' + esc(s.employee_name) + '</td>' +
+        cells +
+      '</tr>';
+    }).join('');
+
+    var dateHeaders = dates.map(function (d) {
+      var dt = new Date(d + 'T12:00:00Z');
+      var dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      return '<th style="padding:10px;border:1px solid #eef1f4;background:#f5f7fa;font-size:12px;min-width:110px">' +
+        '<div>' + dayNames[dt.getUTCDay()] + '</div>' +
+        '<div style="font-weight:400;color:#666;font-size:11px">' + d + '</div>' +
+      '</th>';
+    }).join('');
 
     var html =
       '<div style="background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)">' +
@@ -488,13 +526,24 @@
           '<ul style="margin:0;padding-left:20px">' + warnings.map(function (w) { return '<li>' + esc(w.message) + '</li>'; }).join('') + '</ul>' +
         '</div>' : '') +
       '<div style="background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)">' +
+        '<h3 style="margin:0 0 12px;font-size:15px">📅 Weekly grid</h3>' +
+        '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">' +
+          '<thead><tr>' +
+            '<th style="padding:10px;border:1px solid #eef1f4;background:#f5f7fa;text-align:left;position:sticky;left:0;z-index:2">Captain</th>' +
+            dateHeaders +
+          '</tr></thead>' +
+          '<tbody>' + gridRows + '</tbody>' +
+        '</table></div>' +
+      '</div>' +
+      '<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06)">' +
         '<h3 style="margin:0 0 12px;font-size:15px">Captain stats</h3>' +
-        '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f5f7fa">' +
-          '<th style="text-align:left;padding:10px">Captain</th>' +
-          '<th style="text-align:left;padding:10px">Shifts</th>' +
-          '<th style="text-align:left;padding:10px">Hours</th>' +
-          '<th style="text-align:left;padding:10px">Min OK</th>' +
-        '</tr></thead><tbody>' +
+        '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
+          '<thead><tr style="background:#f5f7fa">' +
+            '<th style="text-align:left;padding:10px">Captain</th>' +
+            '<th style="text-align:left;padding:10px">Shifts</th>' +
+            '<th style="text-align:left;padding:10px">Hours</th>' +
+            '<th style="text-align:left;padding:10px">Min OK</th>' +
+          '</tr></thead><tbody>' +
           stats.map(function (s) {
             return '<tr style="border-bottom:1px solid #eef1f4">' +
               '<td style="padding:10px">' + esc(s.employee_name) + '</td>' +
@@ -504,25 +553,6 @@
             '</tr>';
           }).join('') +
         '</tbody></table></div>' +
-      '</div>' +
-      '<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06)">' +
-        '<h3 style="margin:0 0 12px;font-size:15px">Assignments preview (first 40)</h3>' +
-        '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f5f7fa">' +
-          '<th style="text-align:left;padding:10px">Date</th>' +
-          '<th style="text-align:left;padding:10px">Captain</th>' +
-          '<th style="text-align:left;padding:10px">Branch</th>' +
-          '<th style="text-align:left;padding:10px">Shift</th>' +
-        '</tr></thead><tbody>' +
-          assignments.slice(0, 40).map(function (a) {
-            return '<tr style="border-bottom:1px solid #eef1f4">' +
-              '<td style="padding:10px">' + esc(a.work_date) + '</td>' +
-              '<td style="padding:10px">' + esc(a.employee_id) + '</td>' +
-              '<td style="padding:10px">' + esc(a.branch_id) + '</td>' +
-              '<td style="padding:10px">' + esc(a.shift_id) + '</td>' +
-            '</tr>';
-          }).join('') +
-        '</tbody></table></div>' +
-        (assignments.length > 40 ? '<div style="color:#666;font-size:12px;margin-top:8px">Showing 40 of ' + assignments.length + '</div>' : '') +
       '</div>';
 
     container.innerHTML = html;
