@@ -9,22 +9,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 
-/**
- * Android-independent heart of the native tracker: what to record, a durable ordered queue, and syncing to the SAME
- * backend API (action "submitLocation"). It never decides inside/outside or lateness - the server does.
- *
- * Guarantees (all covered by tests/native):
- *  - interval / minimum-movement filtering with a heartbeat so a stationary employee is not flagged "tracking unavailable"
- *  - no duplicate points (UNIQUE timestamp per employee in the store; the server also de-duplicates)
- *  - points are sent oldest first and removed ONLY after the server answered; network loss keeps them (with back-off)
- *  - NO_ACTIVE_SHIFT / expired session end tracking and clear the queue; bad batches never block the queue
- *  - the reported state is real: ACTIVE only while fixes keep arriving
- */
 public final class TrackingCore {
     public interface Clock { long now(); }
     public interface Transport { Response post(String url, String body) throws IOException; }
     public interface Store {
-        /** @return false when a point with this timestamp already exists for the employee (duplicate). */
         boolean insert(String employeeId, long tsMs, String pointJson);
         List<StoredPoint> peek(String employeeId, int max);
         void delete(List<Long> ids);
@@ -57,7 +45,7 @@ public final class TrackingCore {
     private final Config cfg; private final Store store; private final Transport transport; private final Clock clock;
     private long lastRecordedTs = -1, lastFixAt, lastSyncAt, nextAttemptAt, lastSyncAttemptAt;
     private double lastRecLat, lastRecLon;
-    private boolean paused; // captain is on a break: no sampling, no "unavailable" claims
+    private boolean paused;
     private int failures; private boolean ended; private String endedReason, lastError, providerState, reportedState;
     private Double lastLat, lastLon, lastAcc, lastDistance; private Boolean inside;
 
@@ -75,16 +63,23 @@ public final class TrackingCore {
         return 2 * r * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
-    /** Called for every GPS fix from the OS. Returns true when the fix was queued for upload. */
     public synchronized boolean onFix(Fix f) {
         if (ended || paused) return false;
+        
+        // 🛑 الحل السحري: بنرفض أي لوكيشن دقته وحشة (أكبر من 50 متر)
+        // عشان نمنع لوكيشن الشبكة الوهمي من إنه يبوظ الخريطة
+        if (f.accuracy > 50) {
+            lastError = "BAD_ACCURACY";
+            return false; 
+        }
+
         lastFixAt = clock.now(); lastLat = f.lat; lastLon = f.lon; lastAcc = f.accuracy; providerState = null;
         if (lastRecordedTs >= 0) {
             long gap = f.timeMs - lastRecordedTs;
-            if (gap <= 0) return false;                                  // old / duplicate fix
-            if (gap < cfg.intervalMs / 2) return false;                  // respect the configured interval (GPS + network providers both fire)
+            if (gap <= 0) return false;
+            if (gap < cfg.intervalMs / 2) return false;
             double moved = distanceMeters(lastRecLat, lastRecLon, f.lat, f.lon);
-            if (moved < cfg.minDistanceMeters && gap < cfg.heartbeatMs) return false; // not moved enough and no heartbeat due
+            if (moved < cfg.minDistanceMeters && gap < cfg.heartbeatMs) return false;
         }
         StringBuilder j = new StringBuilder("{");
         j.append("\"timestamp\":").append(MiniJson.quote(iso(f.timeMs)));
@@ -95,16 +90,14 @@ public final class TrackingCore {
         j.append(",\"tracking_source\":\"BACKGROUND_NATIVE\"");
         if (f.battery != null && f.battery >= 0 && f.battery <= 100) j.append(",\"battery_level\":").append(f.battery);
         j.append('}');
-        if (!store.insert(cfg.employeeId, f.timeMs, j.toString())) return false; // duplicate timestamp: already queued/sent
+        if (!store.insert(cfg.employeeId, f.timeMs, j.toString())) return false;
         lastRecordedTs = f.timeMs; lastRecLat = f.lat; lastRecLon = f.lon;
         return true;
     }
 
-    /** Break: while paused nothing is recorded and the state reads ON_BREAK; queued points are still uploaded. On resume the next fix is recorded immediately. */
     public synchronized void setPaused(boolean p) { if (paused && !p) { lastRecordedTs = -1; providerState = null; } paused = p; }
     public synchronized boolean isPaused() { return paused; }
 
-    /** The OS/provider told us tracking cannot work (permission revoked, GPS switched off...). Reported to the server when possible. */
     public synchronized void setProviderState(String state) {
         providerState = state;
         if (state != null && !state.equals(reportedState)) { reportedState = state; reportStateToServer(state); }
@@ -112,12 +105,11 @@ public final class TrackingCore {
 
     private void reportStateToServer(String state) {
         try { transport.post(cfg.apiUrl, "{\"action\":\"submitLocation\",\"token\":" + MiniJson.quote(cfg.token) + ",\"payload\":{\"tracking_state\":" + MiniJson.quote(state) + "},\"client\":\"android-native/1.0\"}"); }
-        catch (IOException e) { /* best effort: the server derives TRACKING_UNAVAILABLE from missing fixes anyway */ }
+        catch (IOException e) { }
     }
 
     public synchronized boolean syncDue(long now) { return !ended && now - lastSyncAttemptAt >= cfg.syncIntervalMs && store.count(cfg.employeeId) > 0; }
 
-    /** Uploads queued points oldest-first. @param force ignore the retry back-off (e.g. network just came back). @return points uploaded. */
     public synchronized int flush(boolean force) {
         int sent = 0;
         lastSyncAttemptAt = clock.now();
@@ -151,8 +143,8 @@ public final class TrackingCore {
             String code = String.valueOf(json.get("error_code"));
             if ("NO_ACTIVE_SHIFT".equals(code)) { store.clear(cfg.employeeId); return end("SHIFT_OVER", code, sent); }
             if ("INVALID_SESSION".equals(code) || "SESSION_EXPIRED".equals(code) || "FORBIDDEN".equals(code) || "PASSWORD_CHANGE_REQUIRED".equals(code)) { store.clear(cfg.employeeId); return end("SESSION_ENDED", code, sent); }
-            if ("VALIDATION_ERROR".equals(code) || "REQUEST_TOO_LARGE".equals(code) || "TRACKING_DISABLED".equals(code)) { store.delete(ids); lastError = code; sent += 0; continue; } // a bad batch must never block the queue
-            return backoff(code, sent); // RATE_LIMITED, SERVER_BUSY, SERVICE_UNAVAILABLE, INTERNAL_ERROR...: keep the points, retry later
+            if ("VALIDATION_ERROR".equals(code) || "REQUEST_TOO_LARGE".equals(code) || "TRACKING_DISABLED".equals(code)) { store.delete(ids); lastError = code; sent += 0; continue; }
+            return backoff(code, sent);
         }
     }
 
@@ -165,7 +157,6 @@ public final class TrackingCore {
 
     private int end(String reason, String code, int sent) { ended = true; endedReason = reason; lastError = code; return sent; }
 
-    /** True when the shift window is over or the server ended the session: the service must stop itself. */
     public synchronized boolean shouldStop() {
         if (!ended && clock.now() >= cfg.stopAtMs) { ended = true; endedReason = "SHIFT_WINDOW_OVER"; }
         return ended;
@@ -180,7 +171,7 @@ public final class TrackingCore {
         if (!s.running) s.state = "STOPPED";
         else if (paused) s.state = "ON_BREAK";
         else if (providerState != null) s.state = providerState;
-        else if (lastFixAt == 0 || now - lastFixAt > Math.max(2 * cfg.intervalMs, cfg.heartbeatMs)) s.state = "UNAVAILABLE"; // no recent fix: never claim ACTIVE
+        else if (lastFixAt == 0 || now - lastFixAt > Math.max(2 * cfg.intervalMs, cfg.heartbeatMs)) s.state = "UNAVAILABLE";
         else s.state = "ACTIVE";
         return s;
     }
