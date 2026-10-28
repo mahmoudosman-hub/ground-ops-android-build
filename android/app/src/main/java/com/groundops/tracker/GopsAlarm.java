@@ -15,6 +15,8 @@ import android.util.Log;
 public class GopsAlarm {
     private static MediaPlayer mediaPlayer = null;
     private static Vibrator vibrator = null;
+    private static Handler handler = new Handler(Looper.getMainLooper());
+    private static Runnable stopRunnable = null;
 
     public static void start(Context ctx) {
         stop(); // إيقاف أي إنذار قديم شغال
@@ -26,7 +28,7 @@ public class GopsAlarm {
                 boolean isScreenOn = Build.VERSION.SDK_INT >= 20 ? pm.isInteractive() : pm.isScreenOn();
                 if (!isScreenOn) {
                     PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE, "GopsAlarm:WakeLock");
-                    wl.acquire(10000); // 10 ثواني كفاية
+                    wl.acquire(10000); // 10 ثواني كفاية لإيقاظ الشاشة
                 }
             }
         } catch (Exception e) { Log.w("GopsAlarm", "WakeLock failed", e); }
@@ -35,7 +37,7 @@ public class GopsAlarm {
             // 2. تشغيل الصوت (نغمة الأذان)
             mediaPlayer = new MediaPlayer();
             mediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM) // يشتغل حتى لو الموبايل صامت
+                .setUsage(AudioAttributes.USAGE_ALARM) 
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build());
             
@@ -59,11 +61,12 @@ public class GopsAlarm {
             }
 
             // 4. إيقاف الإنذار بعد 5 دقايق تلقائياً
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            stopRunnable = new Runnable() {
                 @Override public void run() {
                     stop();
                 }
-            }, 5 * 60 * 1000);
+            };
+            handler.postDelayed(stopRunnable, 5 * 60 * 1000);
 
         } catch (Exception e) {
             Log.w("GopsAlarm", "Failed to start alarm", e);
@@ -71,6 +74,10 @@ public class GopsAlarm {
     }
 
     public static void stop() {
+        if (stopRunnable != null) {
+            handler.removeCallbacks(stopRunnable);
+            stopRunnable = null;
+        }
         if (mediaPlayer != null) {
             try { mediaPlayer.stop(); mediaPlayer.release(); } catch (Exception e) {}
             mediaPlayer = null;
