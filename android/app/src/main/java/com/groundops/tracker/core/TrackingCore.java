@@ -66,10 +66,22 @@ public final class TrackingCore {
     public synchronized boolean onFix(Fix f) {
         if (ended || paused) return false;
         
-        // 🛑 رفض اللوكيشن الوهمي (دقة أكبر من 50 متر)
-        if (f.accuracy > 50) {
+        // 1. رفض اللوكيشن اللي دقته وحشة جداً (أكبر من 100 متر)
+        if (f.accuracy > 100) {
             lastError = "BAD_ACCURACY";
             return false; 
+        }
+
+        // 2. فلتر الانتقال الآني (Teleportation Filter)
+        if (lastRecordedTs > 0) {
+            long timeDiffMs = f.timeMs - lastRecordedTs;
+            double distMoved = distanceMeters(lastRecLat, lastRecLon, f.lat, f.lon);
+            
+            // لو الوقت اللي فات أقل من دقيقة، والمسافة أكبر من 150 متر (مستحيل تمشيها في دقيقة)، نرفض اللوكيشن ده
+            if (timeDiffMs > 0 && timeDiffMs < 60000 && distMoved > 150) {
+                lastError = "TELEPORTATION_BLOCKED";
+                return false;
+            }
         }
 
         lastFixAt = clock.now(); lastLat = f.lat; lastLon = f.lon; lastAcc = f.accuracy; providerState = null;
@@ -166,7 +178,7 @@ public final class TrackingCore {
         long now = clock.now();
         s.ended = ended; s.endedReason = endedReason; s.lastError = lastError;
         s.running = serviceRunning && !ended; s.lastFixAt = lastFixAt; s.lastSyncAt = lastSyncAt; s.pending = store.count(cfg.employeeId);
-        s.lastLat = lastLat; s.lastLon = lastLon; s.lastAccuracy = lastAcc; s.lastDistance = lastDistance; s.inside = inside;
+        s.lastLat = lastLat; s.lastLon = lastLon; s.lastAcc = lastAcc; s.lastDistance = lastDistance; s.inside = inside;
         if (!s.running) s.state = "STOPPED";
         else if (paused) s.state = "ON_BREAK";
         else if (providerState != null) s.state = providerState;
