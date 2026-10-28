@@ -39,13 +39,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/**
- * Foreground service (type "location") that keeps sampling GPS and uploading points while the screen is locked or the
- * app is minimised. It is started only from the visible app (when the employee is checked in) and stops on check-out,
- * when the server reports the shift is over, when the session ends, or at the configured stop time.
- * START_NOT_STICKY: if Android kills it we do NOT pretend otherwise - the web layer sees "not running" and shows it.
- * All decisions about the filtering/queue/sync live in core/TrackingCore (unit-tested against the real backend).
- */
 public class LocationForegroundService extends Service {
     public static final String ACTION_START = "com.groundops.tracker.START", ACTION_STOP = "com.groundops.tracker.STOP", EXTRA_CONFIG = "config";
     private static final String CHANNEL = "gops_tracking"; private static final int NOTIF_ID = 4711; private static final long TICK_MS = 30000;
@@ -61,35 +54,55 @@ public class LocationForegroundService extends Service {
         LocationForegroundService s = instance;
         if (s != null && s.running && s.core != null) return s.statusJson(true);
         JSONObject last = new TrackingPrefs(ctx).status();
-        try { // the service is NOT alive: never report it as running; keep the real reason/ended flag and the real queue size
+        try {
             last.put("running", false); last.put("state", "STOPPED");
             String cfg = new TrackingPrefs(ctx).config(); String emp = last.optString("employeeId", "");
             if (emp.length() > 0) last.put("pendingPoints", new SqlitePointStore(ctx).count(emp));
-        } catch (JSONException e) { /* keep what we have */ }
+        } catch (JSONException e) { }
         return last;
+    }
+
+    @Override public void onCreate() {
+        super.onCreate();
+        io = Executors.newSingleThreadExecutor(); // ننشئ الخيط في الأول
     }
 
     @Override public IBinder onBind(Intent intent) { return null; }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent == null) { stopSelf(); return START_NOT_STICKY; }
-        if (ACTION_STOP.equals(intent.getAction())) { shutdown("STOP_REQUESTED", false); return START_NOT_STICKY; }
-        String cfgJson = intent.getStringExtra(EXTRA_CONFIG);
-        if (cfgJson == null) { stopSelf(); return START_NOT_STICKY; }
-        try { goForeground(); } catch (RuntimeException e) { // e.g. started while the app is not visible (Android 12+ restriction)
-            prefs = new TrackingPrefs(this); writeStatus("UNAVAILABLE", "START_NOT_ALLOWED", false); stopSelf(); return START_NOT_STICKY;
+        if (intent == null) { stopSelf(); return START_STICKY; }
+        if (ACTION_STOP.equals(intent.getAction())) { shutdown("STOP_REQUESTED", false); return START_STICKY; }
+        
+        final String cfgJson = intent.getStringExtra(EXTRA_CONFIG);
+        if (cfgJson == null) { stopSelf(); return START_STICKY; }
+        
+        try { goForeground(); } catch (RuntimeException e) { 
+            prefs = new TrackingPrefs(this); writeStatus("UNAVAILABLE", "START_NOT_ALLOWED", false); stopSelf(); return START_STICKY;
         }
-        if (running) return START_NOT_STICKY; // already tracking
-        try { begin(cfgJson); } catch (RuntimeException e) { writeStatus("UNAVAILABLE", "START_FAILED", false); shutdown("START_FAILED", false); }
-        return START_NOT_STICKY;
+        
+        if (running) return START_STICKY; // الخدمة شغالة بالفعل
+
+        // 👇 بننقل دالة begin للخلفية عشان نمنع التعليق (ANR)
+        if (io == null) io = Executors.newSingleThreadExecutor();
+        io.execute(new Runnable() {
+            @Override public void run() {
+                try { 
+                    begin(cfgJson); 
+                } catch (RuntimeException e) { 
+                    writeStatus("UNAVAILABLE", "START_FAILED", false); 
+                    shutdown("START_FAILED", false); 
+                }
+            }
+        });
+        
+        return START_STICKY; // 👈 خليناها STICKY عشان النظام يحاول يرجعها لو قفلها
     }
 
     private Notification buildNotification(boolean onBreak) {
         Intent open = getPackageManager().getLaunchIntentForPackage(getPackageName());
         PendingIntent pi = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        Notification n = new NotificationCompat.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_stat_tracking).setContentTitle("Ground OPS Tracker")
+        return new NotificationCompat.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_stat_tracking).setContentTitle("Ground OPS Tracker")
             .setContentText(onBreak ? "On break - location paused" : "Location tracking is active during your shift").setOngoing(true).setOnlyAlertOnce(true).setContentIntent(pi).setCategory(NotificationCompat.CATEGORY_SERVICE).build();
-        return n;
     }
 
     private void goForeground() {
@@ -111,23 +124,27 @@ public class LocationForegroundService extends Service {
         cfgToken = c.token == null ? "" : c.token;
         store = new SqlitePointStore(this);
         core = new TrackingCore(c, store, new HttpTransport(30000, false), new TrackingCore.Clock() { @Override public long now() { return System.currentTimeMillis(); } });
-        thread = new HandlerThread("gops-location"); thread.start(); handler = new Handler(thread.getLooper()); io = Executors.newSingleThreadExecutor();
+        thread = new HandlerThread("gops-location"); thread.start(); handler = new Handler(thread.getLooper());
+        // (هنا شيلنا سطر io = Executors.newSingleThreadExecutor() لأنه اتعمل في onCreate)
         lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE); cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        instance = this; running = true;
-        listener = new LocationListener() {
-            @Override public void onLocationChanged(final Location l) { io.execute(new Runnable() { @Override public void run() { handleFix(l); } }); }
-            @Override public void onProviderDisabled(String p) { io.execute(new Runnable() { @Override public void run() { checkProviders(); } }); }
-            @Override public void onProviderEnabled(String p) { io.execute(new Runnable() { @Override public void run() { checkProviders(); } }); }
-            @Override public void onStatusChanged(String p, int s, Bundle e) { /* deprecated, required below API 29 */ }
-        };
-        requestUpdates();
-        if (cm != null) {
-            netCb = new ConnectivityManager.NetworkCallback() { @Override public void onAvailable(Network n) { io.execute(new Runnable() { @Override public void run() { if (core != null) { core.flush(true); persist(); } } }); } };
-            try { cm.registerNetworkCallback(new NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), netCb); } catch (RuntimeException e) { netCb = null; }
+        
+        if (!running) {
+            instance = this; running = true;
+            listener = new LocationListener() {
+                @Override public void onLocationChanged(final Location l) { io.execute(new Runnable() { @Override public void run() { handleFix(l); } }); }
+                @Override public void onProviderDisabled(String p) { io.execute(new Runnable() { @Override public void run() { checkProviders(); } }); }
+                @Override public void onProviderEnabled(String p) { io.execute(new Runnable() { @Override public void run() { checkProviders(); } }); }
+                @Override public void onStatusChanged(String p, int s, Bundle e) { }
+            };
+            requestUpdates();
+            if (cm != null) {
+                netCb = new ConnectivityManager.NetworkCallback() { @Override public void onAvailable(Network n) { io.execute(new Runnable() { @Override public void run() { if (core != null) { core.flush(true); persist(); } } }); } };
+                try { cm.registerNetworkCallback(new NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), netCb); } catch (RuntimeException e) { netCb = null; }
+            }
+            handler.postDelayed(tick, TICK_MS);
+            io.execute(new Runnable() { @Override public void run() { checkProviders(); core.flush(true); persist(); } });
+            persist();
         }
-        handler.postDelayed(tick, TICK_MS);
-        io.execute(new Runnable() { @Override public void run() { checkProviders(); core.flush(true); persist(); } }); // upload anything left from an earlier session
-        persist();
     }
 
     private final Runnable tick = new Runnable() {
@@ -164,12 +181,11 @@ public class LocationForegroundService extends Service {
     }
     private long readInterval() { try { return new JSONObject(prefs.config()).optLong("intervalMs", 300000); } catch (Exception e) { return 300000; } }
 
-    /** Reports the REAL reason when no usable provider/permission exists. */
     private void checkProviders() {
-        if (core == null || lm == null || core.isPaused()) return; // on a break location may be off: not an error
+        if (core == null || lm == null || core.isPaused()) return;
         if (!hasPermission()) { core.setProviderState("PERMISSION_DENIED"); return; }
         boolean gps = false, net = false;
-        try { gps = lm.isProviderEnabled(LocationManager.GPS_PROVIDER); net = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER); } catch (RuntimeException e) { /* treated as off */ }
+        try { gps = lm.isProviderEnabled(LocationManager.GPS_PROVIDER); net = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER); } catch (RuntimeException e) { }
         if (!gps && !net) core.setProviderState("GPS_DISABLED");
     }
 
@@ -202,22 +218,21 @@ public class LocationForegroundService extends Service {
             o.put("lastFixAt", s.lastFixAt == 0 ? JSONObject.NULL : s.lastFixAt); o.put("lastSyncAt", s.lastSyncAt == 0 ? JSONObject.NULL : s.lastSyncAt);
             if (s.lastLat != null) { o.put("lastLatitude", s.lastLat); o.put("lastLongitude", s.lastLon); o.put("lastAccuracy", s.lastAccuracy); }
             if (s.lastDistance != null) o.put("lastDistance", s.lastDistance); if (s.inside != null) o.put("inside", s.inside);
-        } catch (JSONException e) { /* cannot happen for these types */ }
+        } catch (JSONException e) { }
         return o;
     }
     private void persist() { if (core != null && prefs != null) prefs.saveStatus(statusJson(running)); }
     private void writeStatus(String state, String error, boolean ended) {
         if (prefs == null) prefs = new TrackingPrefs(this);
-        try { JSONObject o = new JSONObject(); o.put("running", false); o.put("state", state); o.put("lastError", error); o.put("ended", ended); o.put("pendingPoints", 0); prefs.saveStatus(o); } catch (JSONException e) { /* ignore */ }
+        try { JSONObject o = new JSONObject(); o.put("running", false); o.put("state", state); o.put("lastError", error); o.put("ended", ended); o.put("pendingPoints", 0); prefs.saveStatus(o); } catch (JSONException e) { }
     }
 
-    /** Stops tracking for good: no more updates, token removed from storage, notification gone. */
     private synchronized void shutdown(String reason, boolean ended) {
         boolean wasRunning = running; running = false;
-        try { if (lm != null && listener != null) lm.removeUpdates(listener); } catch (RuntimeException e) { /* ignore */ }
-        try { if (cm != null && netCb != null) cm.unregisterNetworkCallback(netCb); } catch (RuntimeException e) { /* ignore */ }
+        try { if (lm != null && listener != null) lm.removeUpdates(listener); } catch (RuntimeException e) { }
+        try { if (cm != null && netCb != null) cm.unregisterNetworkCallback(netCb); } catch (RuntimeException e) { }
         if (handler != null) handler.removeCallbacksAndMessages(null);
-        if (core != null && wasRunning) { JSONObject o = statusJson(false); try { o.put("running", false); o.put("state", "STOPPED"); if (reason != null && !ended) o.put("endedReason", reason); o.put("ended", ended || o.optBoolean("ended")); } catch (JSONException e) { /* ignore */ } if (prefs != null) prefs.saveStatus(o); }
+        if (core != null && wasRunning) { JSONObject o = statusJson(false); try { o.put("running", false); o.put("state", "STOPPED"); if (reason != null && !ended) o.put("endedReason", reason); o.put("ended", ended || o.optBoolean("ended")); } catch (JSONException e) { } if (prefs != null) prefs.saveStatus(o); }
         if (prefs != null) prefs.clearConfig();
         if (io != null) io.shutdown();
         if (thread != null) thread.quitSafely();
@@ -226,17 +241,15 @@ public class LocationForegroundService extends Service {
     }
     public void stopTracking() { shutdown("STOP_REQUESTED", false); }
 
-    /** Break: stop sampling the GPS but keep the service and its notification alive. Queued points still upload. */
     public void pauseTracking() {
         if (!running || io == null) return;
         io.execute(new Runnable() { @Override public void run() {
             if (core == null || core.isPaused()) return;
-            try { if (lm != null && listener != null) lm.removeUpdates(listener); } catch (RuntimeException e) { /* ignore */ }
+            try { if (lm != null && listener != null) lm.removeUpdates(listener); } catch (RuntimeException e) { }
             core.setPaused(true); showNotification(true); persist();
         } });
     }
 
-    /** End of a break: sample again right away (the next fix is recorded immediately). */
     public void resumeTracking() {
         if (!running || io == null) return;
         io.execute(new Runnable() { @Override public void run() {
@@ -246,11 +259,11 @@ public class LocationForegroundService extends Service {
     }
 
     private void showNotification(boolean onBreak) {
-        try { NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE); if (nm != null) nm.notify(NOTIF_ID, buildNotification(onBreak)); } catch (RuntimeException e) { /* notification is cosmetic */ }
+        try { NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE); if (nm != null) nm.notify(NOTIF_ID, buildNotification(onBreak)); } catch (RuntimeException e) { }
     }
 
     @Override public void onDestroy() { if (running) shutdown("SERVICE_DESTROYED", false); instance = null; super.onDestroy(); }
-    @Override public void onTaskRemoved(Intent rootIntent) { /* keep tracking: the foreground service survives the app being swiped away on most devices */ super.onTaskRemoved(rootIntent); }
+    @Override public void onTaskRemoved(Intent rootIntent) { super.onTaskRemoved(rootIntent); }
 
     private static long num(Map<String, Object> m, String k, long def) { Object o = m.get(k); return o instanceof Double ? ((Double) o).longValue() : def; }
 }
