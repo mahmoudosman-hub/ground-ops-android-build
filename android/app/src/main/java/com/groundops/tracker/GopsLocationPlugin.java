@@ -34,11 +34,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-/**
- * Capacitor plugin "GopsLocation": the ONLY native surface the web app talks to (see frontend/src/services/native/bridge.js).
- * Permissions requested: precise/approximate location "while in use" and (Android 13+) notifications. We deliberately do NOT
- * request ACCESS_BACKGROUND_LOCATION: a location foreground service started from the visible app keeps its access.
- */
 @CapacitorPlugin(name = "GopsLocation", permissions = {
     @Permission(alias = "location", strings = {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}),
     @Permission(alias = "notifications", strings = {"android.permission.POST_NOTIFICATIONS"})
@@ -70,10 +65,20 @@ public class GopsLocationPlugin extends Plugin {
     @PluginMethod public void getCurrentPosition(final PluginCall call) {
         if (!hasLocation()) { call.reject("Location permission denied", "PERMISSION_DENIED"); return; }
         final LocationManager lm = (LocationManager) ctx().getSystemService(Context.LOCATION_SERVICE);
-        final long timeout = call.getLong("timeoutMs", 20000L);
+        
+        // 🛑 التعديل هنا: قللنا الوقت لـ 7 ثواني بالكتير
+        final long timeout = 7000L; 
+        
         String provider = null;
-        try { provider = lm.isProviderEnabled(LocationManager.GPS_PROVIDER) ? LocationManager.GPS_PROVIDER : (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) ? LocationManager.NETWORK_PROVIDER : null); } catch (RuntimeException e) { provider = null; }
-        if (provider == null) { call.reject("Location is switched off", "GPS_DISABLED"); return; }
+        try { 
+            // 🛑 التعديل هنا: بنجبره يستخدم GPS بس، ومش بنقبل Network في زرار الـ Check GPS
+            if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                provider = LocationManager.GPS_PROVIDER;
+            }
+        } catch (RuntimeException e) { provider = null; }
+        
+        if (provider == null) { call.reject("GPS is switched off or not available. Please turn on Location.", "GPS_DISABLED"); return; }
+        
         final AtomicBoolean done = new AtomicBoolean(false);
         final Handler main = new Handler(Looper.getMainLooper());
         try {
@@ -90,13 +95,14 @@ public class GopsLocationPlugin extends Plugin {
                     @Override public void onStatusChanged(String p, int s, android.os.Bundle e) { }
                 };
                 lm.requestSingleUpdate(provider, one, Looper.getMainLooper());
-                main.postDelayed(new Runnable() { @Override public void run() { try { lm.removeUpdates(one); } catch (RuntimeException e) { /* ignore */ } finish(call, done, null); } }, timeout);
+                main.postDelayed(new Runnable() { @Override public void run() { try { lm.removeUpdates(one); } catch (RuntimeException e) { } finish(call, done, null); } }, timeout);
             }
         } catch (SecurityException e) { call.reject("Location permission denied", "PERMISSION_DENIED"); }
     }
+    
     private void finish(PluginCall call, AtomicBoolean done, Location l) {
         if (!done.compareAndSet(false, true)) return;
-        if (l == null) { call.reject("No GPS fix in time", "TIMEOUT"); return; }
+        if (l == null) { call.reject("No GPS fix in time. Move to an open area and try again.", "TIMEOUT"); return; }
         JSObject o = new JSObject(); o.put("latitude", l.getLatitude()); o.put("longitude", l.getLongitude()); o.put("accuracy", l.hasAccuracy() ? l.getAccuracy() : 1000);
         o.put("timestamp", l.getTime() > 0 ? l.getTime() : System.currentTimeMillis()); o.put("isMock", Build.VERSION.SDK_INT >= 31 ? l.isMock() : l.isFromMockProvider());
         String p = l.getProvider(); o.put("source", LocationManager.GPS_PROVIDER.equals(p) ? "gps" : LocationManager.NETWORK_PROVIDER.equals(p) ? "network" : "fused".equals(p) ? "fused" : "unknown");
@@ -125,7 +131,6 @@ public class GopsLocationPlugin extends Plugin {
         JSObject o = new JSObject(); o.put("stopped", true); call.resolve(o);
     }
 
-    /** Break: GPS sampling stops, the service stays alive. */
     @PluginMethod public void pauseTracking(PluginCall call) {
         LocationForegroundService s = LocationForegroundService.instance;
         if (s == null) { call.reject("Tracking service is not running", "NOT_RUNNING"); return; }
@@ -143,7 +148,7 @@ public class GopsLocationPlugin extends Plugin {
 
     @PluginMethod public void getNativeLocationStatus(PluginCall call) {
         JSObject o = new JSObject(); LocationManager lm = (LocationManager) ctx().getSystemService(Context.LOCATION_SERVICE);
-        boolean gps = false; try { gps = lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER); } catch (RuntimeException e) { /* off */ }
+        boolean gps = false; try { gps = lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER); } catch (RuntimeException e) { }
         o.put("permission", locationState()); o.put("gpsEnabled", gps); o.put("notificationsEnabled", NotificationManagerCompat.from(ctx()).areNotificationsEnabled());
         PowerManager pm = (PowerManager) ctx().getSystemService(Context.POWER_SERVICE);
         o.put("ignoringBatteryOptimizations", Build.VERSION.SDK_INT >= 23 && pm != null ? pm.isIgnoringBatteryOptimizations(ctx().getPackageName()) : JSONObject.NULL);
@@ -153,7 +158,6 @@ public class GopsLocationPlugin extends Plugin {
         call.resolve(o);
     }
 
-    /** Opens the system battery-optimisation LIST (no special permission needed, unlike the one-tap request dialog that Play restricts). */
     @PluginMethod public void openBatterySettings(PluginCall call) {
         open(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS), call);
     }
