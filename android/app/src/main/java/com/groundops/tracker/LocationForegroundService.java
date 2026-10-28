@@ -41,17 +41,33 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class LocationForegroundService extends Service {
-    public static final String ACTION_START = "com.groundops.tracker.START", ACTION_STOP = "com.groundops.tracker.STOP", EXTRA_CONFIG = "config";
+    public static final String ACTION_START = "com.groundops.tracker.START"; 
+    public static final String ACTION_STOP = "com.groundops.tracker.STOP";
+    public static final String EXTRA_CONFIG = "config";
+    public static final String ACTION_ALARM_CHECK = "GPS_ALARM_CHECK";
+    
     private static final String CHANNEL = "gops_tracking"; 
     private static final String ALARM_CHANNEL = "gops_gps_alarm_v3";
     private static final int NOTIF_ID = 4711; 
     private static final int ALARM_NOTIF_ID = 9999;
+    private static final int ALARM_REQUEST_CODE = 555;
     private static final long TICK_MS = 30000;
+    
     public static volatile LocationForegroundService instance;
 
-    private TrackingCore core; private TrackingPrefs prefs; private SqlitePointStore store; private LocationManager lm; private ConnectivityManager cm;
-    private HandlerThread thread; private Handler handler; private ExecutorService io; private LocationListener listener; private ConnectivityManager.NetworkCallback netCb;
-    private volatile boolean running; private String employeeId = "";
+    private TrackingCore core; 
+    private TrackingPrefs prefs; 
+    private SqlitePointStore store; 
+    private LocationManager lm; 
+    private ConnectivityManager cm;
+    private HandlerThread thread; 
+    private Handler handler; 
+    private ExecutorService io; 
+    private LocationListener listener; 
+    private ConnectivityManager.NetworkCallback netCb;
+    
+    private volatile boolean running; 
+    private String employeeId = "";
     private String cfgApiUrl = "", cfgToken = "";
     private long lastSelfiePollMs = 0L;
     private long lastLocationTimeMs = 0L;
@@ -61,23 +77,42 @@ public class LocationForegroundService extends Service {
         if (s != null && s.running && s.core != null) return s.statusJson(true);
         JSONObject last = new TrackingPrefs(ctx).status();
         try {
-            last.put("running", false); last.put("state", "STOPPED");
+            last.put("running", false); 
+            last.put("state", "STOPPED");
             String emp = last.optString("employeeId", "");
             if (emp.length() > 0) last.put("pendingPoints", new SqlitePointStore(ctx).count(emp));
         } catch (JSONException e) { }
         return last;
     }
 
-    @Override public void onCreate() {
+    @Override 
+    public void onCreate() {
         super.onCreate();
         io = Executors.newSingleThreadExecutor();
     }
 
-    @Override public IBinder onBind(Intent intent) { return null; }
+    @Override 
+    public IBinder onBind(Intent intent) { return null; }
 
-    @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent == null) { stopSelf(); return START_STICKY; }
-        if (ACTION_STOP.equals(intent.getAction())) { shutdown("STOP_REQUESTED", false); return START_STICKY; }
+    @Override 
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent == null) return START_STICKY;
+        
+        String action = intent.getAction();
+        
+        if (ACTION_STOP.equals(action)) { 
+            shutdown("STOP_REQUESTED", false); 
+            return START_STICKY; 
+        }
+        
+        if (ACTION_ALARM_CHECK.equals(action)) {
+            long __now = System.currentTimeMillis();
+            if (__now - lastLocationTimeMs >= 15 * 60 * 1000) {
+                fireGpsAlarm();
+            }
+            scheduleAlarm(); // نعيد ضبط المنبه للـ 15 دقيقة اللي جاية
+            return START_STICKY;
+        }
         
         final String cfgJson = intent.getStringExtra(EXTRA_CONFIG);
         if (cfgJson == null) { stopSelf(); return START_STICKY; }
@@ -147,7 +182,7 @@ public class LocationForegroundService extends Service {
                 try { cm.registerNetworkCallback(new NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), netCb); } catch (RuntimeException e) { netCb = null; }
             }
             handler.postDelayed(tick, TICK_MS);
-            scheduleAlarm(); // بنشغل المنبه بتاع الـ 15 دقيقة
+            scheduleAlarm(); // تشغيل المنبه
             io.execute(new Runnable() { @Override public void run() { checkProviders(); core.flush(true); persist(); } });
             persist();
         }
@@ -163,11 +198,6 @@ public class LocationForegroundService extends Service {
                 if (core.syncDue(System.currentTimeMillis())) core.flush(false);
                 
                 long __now = System.currentTimeMillis();
-                if (__now - lastLocationTimeMs >= 15 * 60 * 1000) {
-                    // لو عدت 15 دقيقة ومفيش لوكيشن، بنطلق الإنذار فوراً
-                    fireGpsAlarm();
-                }
-
                 if (__now - lastSelfiePollMs >= 60000L) {
                     lastSelfiePollMs = __now;
                     SelfieCheckNotifier.pollAndNotify(LocationForegroundService.this, cfgApiUrl, cfgToken, employeeId);
@@ -179,37 +209,18 @@ public class LocationForegroundService extends Service {
         }
     };
 
-    // دالة بتظبط "منبه" في نظام الأندرويد كل 15 دقيقة
     private void scheduleAlarm() {
         AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         if (am == null) return;
-        
         Intent intent = new Intent(this, LocationForegroundService.class);
-        intent.setAction("GPS_ALARM_CHECK");
-        PendingIntent pi = PendingIntent.getService(this, 555, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-        long triggerTime = System.currentTimeMillis() + 15 * 60 * 1000; // 15 دقيقة
-        
+        intent.setAction(ACTION_ALARM_CHECK);
+        PendingIntent pi = PendingIntent.getService(this, ALARM_REQUEST_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        long triggerTime = System.currentTimeMillis() + 15 * 60 * 1000;
         if (Build.VERSION.SDK_INT >= 23) {
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pi);
         } else {
             am.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pi);
         }
-    }
-
-    // لما المنبه يضرب، بنشغل الإنذار
-    @Override
-    public void onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && "GPS_ALARM_CHECK".equals(intent.getAction())) {
-            long __now = System.currentTimeMillis();
-            if (__now - lastLocationTimeMs >= 15 * 60 * 1000) {
-                fireGpsAlarm();
-            }
-            scheduleAlarm(); // نعيد ضبط المنبه للـ 15 دقيقة اللي جاية
-            return START_STICKY;
-        }
-        // ... باقي الكود بتاع onStartCommand زي ما هو
-        return super.onStartCommand(intent, flags, startId);
     }
 
     private void fireGpsAlarm() {
@@ -285,9 +296,10 @@ public class LocationForegroundService extends Service {
         
         if (recorded) {
             lastLocationTimeMs = System.currentTimeMillis();
+            GopsAlarm.stop(); // بنطفي الإنذار لو اللوكيشن رجع
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.cancel(ALARM_NOTIF_ID);
-            GopsAlarm.stop();
+            scheduleAlarm(); // بنعيد ضبط المنبه من جديد
             if (core.syncDue(System.currentTimeMillis())) core.flush(false);
         }
         
