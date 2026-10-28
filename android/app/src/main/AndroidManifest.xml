@@ -23,6 +23,10 @@
     <!-- 👇 السطر الجديد ده عشان نسمح بالإشعار يظهر كـ Popup فوق الشاشة -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
+    <!-- 👇 الصلاحيات الجديدة اللي ضفناها للمنبه (AlarmManager) وإيقاظ الشاشة (WakeLock) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <!-- Selfie at check-in (live camera only; no photo-library access). -->
     <uses-permission android:name="android.permission.CAMERA" />
 
