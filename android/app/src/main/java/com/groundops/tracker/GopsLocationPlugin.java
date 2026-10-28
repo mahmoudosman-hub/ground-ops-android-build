@@ -65,15 +65,13 @@ public class GopsLocationPlugin extends Plugin {
     @PluginMethod public void getCurrentPosition(final PluginCall call) {
         if (!hasLocation()) { call.reject("Location permission denied", "PERMISSION_DENIED"); return; }
         final LocationManager lm = (LocationManager) ctx().getSystemService(Context.LOCATION_SERVICE);
-        
-        // 🛑 التعديل هنا: قللنا الوقت لـ 7 ثواني بالكتير
-        final long timeout = 7000L; 
-        
+        final long timeout = call.getLong("timeoutMs", 10000L); // 10 ثواني
         String provider = null;
         try { 
-            // 🛑 التعديل هنا: بنجبره يستخدم GPS بس، ومش بنقبل Network في زرار الـ Check GPS
             if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                 provider = LocationManager.GPS_PROVIDER;
+            } else if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                provider = LocationManager.NETWORK_PROVIDER;
             }
         } catch (RuntimeException e) { provider = null; }
         
@@ -84,7 +82,12 @@ public class GopsLocationPlugin extends Plugin {
         try {
             if (Build.VERSION.SDK_INT >= 30) {
                 final CancellationSignal cs = new CancellationSignal();
-                main.postDelayed(new Runnable() { @Override public void run() { cs.cancel(); } }, timeout);
+                main.postDelayed(new Runnable() { 
+                    @Override public void run() { 
+                        cs.cancel(); 
+                        finish(call, done, null); // 👈 التعديل هنا: بنرجع إيرور للواجهة غصب عنها
+                    } 
+                }, timeout);
                 Executor ex = ContextCompat.getMainExecutor(ctx());
                 lm.getCurrentLocation(provider, cs, ex, new Consumer<Location>() { @Override public void accept(Location l) { finish(call, done, l); } });
             } else {
