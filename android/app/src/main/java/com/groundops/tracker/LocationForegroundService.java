@@ -1,6 +1,6 @@
 package com.groundops.tracker;
 
-import android.Manifest;
+import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -54,9 +54,7 @@ public class LocationForegroundService extends Service {
     private volatile boolean running; private String employeeId = "";
     private String cfgApiUrl = "", cfgToken = "";
     private long lastSelfiePollMs = 0L;
-    
     private long lastLocationTimeMs = 0L;
-    private long lastAlarmTimeMs = 0L;
 
     public static JSONObject snapshot(Context ctx) {
         LocationForegroundService s = instance;
@@ -133,9 +131,7 @@ public class LocationForegroundService extends Service {
         thread = new HandlerThread("gops-location"); thread.start(); handler = new Handler(thread.getLooper());
         lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE); cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         
-        long now = System.currentTimeMillis();
-        lastLocationTimeMs = now;
-        lastAlarmTimeMs = now - (15 * 60 * 1000);
+        lastLocationTimeMs = System.currentTimeMillis();
 
         if (!running) {
             instance = this; running = true;
@@ -151,6 +147,7 @@ public class LocationForegroundService extends Service {
                 try { cm.registerNetworkCallback(new NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), netCb); } catch (RuntimeException e) { netCb = null; }
             }
             handler.postDelayed(tick, TICK_MS);
+            scheduleAlarm(); // بنشغل المنبه بتاع الـ 15 دقيقة
             io.execute(new Runnable() { @Override public void run() { checkProviders(); core.flush(true); persist(); } });
             persist();
         }
@@ -166,12 +163,9 @@ public class LocationForegroundService extends Service {
                 if (core.syncDue(System.currentTimeMillis())) core.flush(false);
                 
                 long __now = System.currentTimeMillis();
-                
                 if (__now - lastLocationTimeMs >= 15 * 60 * 1000) {
-                    if (__now - lastAlarmTimeMs >= 15 * 60 * 1000) {
-                        fireGpsAlarm();
-                        lastAlarmTimeMs = __now;
-                    }
+                    // لو عدت 15 دقيقة ومفيش لوكيشن، بنطلق الإنذار فوراً
+                    fireGpsAlarm();
                 }
 
                 if (__now - lastSelfiePollMs >= 60000L) {
@@ -185,6 +179,39 @@ public class LocationForegroundService extends Service {
         }
     };
 
+    // دالة بتظبط "منبه" في نظام الأندرويد كل 15 دقيقة
+    private void scheduleAlarm() {
+        AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        if (am == null) return;
+        
+        Intent intent = new Intent(this, LocationForegroundService.class);
+        intent.setAction("GPS_ALARM_CHECK");
+        PendingIntent pi = PendingIntent.getService(this, 555, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        long triggerTime = System.currentTimeMillis() + 15 * 60 * 1000; // 15 دقيقة
+        
+        if (Build.VERSION.SDK_INT >= 23) {
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pi);
+        } else {
+            am.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pi);
+        }
+    }
+
+    // لما المنبه يضرب، بنشغل الإنذار
+    @Override
+    public void onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && "GPS_ALARM_CHECK".equals(intent.getAction())) {
+            long __now = System.currentTimeMillis();
+            if (__now - lastLocationTimeMs >= 15 * 60 * 1000) {
+                fireGpsAlarm();
+            }
+            scheduleAlarm(); // نعيد ضبط المنبه للـ 15 دقيقة اللي جاية
+            return START_STICKY;
+        }
+        // ... باقي الكود بتاع onStartCommand زي ما هو
+        return super.onStartCommand(intent, flags, startId);
+    }
+
     private void fireGpsAlarm() {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
@@ -193,11 +220,10 @@ public class LocationForegroundService extends Service {
             NotificationChannel ch = new NotificationChannel(ALARM_CHANNEL, "GPS Missing Alarm", NotificationManager.IMPORTANCE_HIGH);
             ch.setShowBadge(true);
             ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-            ch.setSound(null, null); // الصوت بيتشغل من GopsAlarm
+            ch.setSound(null, null); 
             nm.createNotificationChannel(ch);
         }
 
-        // 👇 هنا بنشغل الإنذار الموحد
         GopsAlarm.start(this);
 
         Intent open = getPackageManager().getLaunchIntentForPackage(getPackageName());
@@ -228,8 +254,8 @@ public class LocationForegroundService extends Service {
     }
 
     private boolean hasPermission() {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-            || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        return ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            || ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
     private void requestUpdates() {
@@ -261,10 +287,7 @@ public class LocationForegroundService extends Service {
             lastLocationTimeMs = System.currentTimeMillis();
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.cancel(ALARM_NOTIF_ID);
-            
-            // لو جاله لوكيشن جديد، بنطفي الإنذار
             GopsAlarm.stop();
-            
             if (core.syncDue(System.currentTimeMillis())) core.flush(false);
         }
         
