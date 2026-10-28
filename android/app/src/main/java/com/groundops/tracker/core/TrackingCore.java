@@ -66,8 +66,7 @@ public final class TrackingCore {
     public synchronized boolean onFix(Fix f) {
         if (ended || paused) return false;
         
-        // 🛑 الحل السحري: بنرفض أي لوكيشن دقته وحشة (أكبر من 50 متر)
-        // عشان نمنع لوكيشن الشبكة الوهمي من إنه يبوظ الخريطة
+        // 🛑 رفض اللوكيشن الوهمي (دقة أكبر من 50 متر)
         if (f.accuracy > 50) {
             lastError = "BAD_ACCURACY";
             return false; 
