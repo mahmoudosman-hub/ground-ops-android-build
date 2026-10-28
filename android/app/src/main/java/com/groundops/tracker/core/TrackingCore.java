@@ -37,7 +37,7 @@ public final class TrackingCore {
         public String state = "STOPPED", lastError, endedReason;
         public long lastFixAt, lastSyncAt;
         public int pending;
-        public Double lastLat, lastLon, lastAccuracy, lastDistance;
+        public Double lastLat, lastLon, lastAccuracy, lastDistance; // 👈 هنا الاسم الصح
         public Boolean inside;
     }
 
@@ -178,7 +178,10 @@ public final class TrackingCore {
         long now = clock.now();
         s.ended = ended; s.endedReason = endedReason; s.lastError = lastError;
         s.running = serviceRunning && !ended; s.lastFixAt = lastFixAt; s.lastSyncAt = lastSyncAt; s.pending = store.count(cfg.employeeId);
-        s.lastLat = lastLat; s.lastLon = lastLon; s.lastAcc = lastAcc; s.lastDistance = lastDistance; s.inside = inside;
+        
+        // 👇 التعديل هنا: غيرنا s.lastAcc إلى s.lastAccuracy
+        s.lastLat = lastLat; s.lastLon = lastLon; s.lastAccuracy = lastAcc; s.lastDistance = lastDistance; s.inside = inside;
+        
         if (!s.running) s.state = "STOPPED";
         else if (paused) s.state = "ON_BREAK";
         else if (providerState != null) s.state = providerState;
