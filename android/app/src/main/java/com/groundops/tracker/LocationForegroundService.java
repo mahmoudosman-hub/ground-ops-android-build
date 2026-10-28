@@ -14,16 +14,20 @@ import android.content.pm.ServiceInfo;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.media.AudioAttributes;
+import android.media.RingtoneManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
+import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
@@ -41,7 +45,11 @@ import java.util.concurrent.Executors;
 
 public class LocationForegroundService extends Service {
     public static final String ACTION_START = "com.groundops.tracker.START", ACTION_STOP = "com.groundops.tracker.STOP", EXTRA_CONFIG = "config";
-    private static final String CHANNEL = "gops_tracking"; private static final int NOTIF_ID = 4711; private static final long TICK_MS = 30000;
+    private static final String CHANNEL = "gops_tracking"; 
+    private static final String ALARM_CHANNEL = "gops_gps_alarm";
+    private static final int NOTIF_ID = 4711; 
+    private static final int ALARM_NOTIF_ID = 9999;
+    private static final long TICK_MS = 30000;
     public static volatile LocationForegroundService instance;
 
     private TrackingCore core; private TrackingPrefs prefs; private SqlitePointStore store; private LocationManager lm; private ConnectivityManager cm;
@@ -49,6 +57,10 @@ public class LocationForegroundService extends Service {
     private volatile boolean running; private String employeeId = "";
     private String cfgApiUrl = "", cfgToken = "";
     private long lastSelfiePollMs = 0L;
+    
+    // 👇 متغيرات جديدة للإنذار
+    private long lastLocationTimeMs = 0L;
+    private boolean alarmActive = false;
 
     public static JSONObject snapshot(Context ctx) {
         LocationForegroundService s = instance;
@@ -125,6 +137,8 @@ public class LocationForegroundService extends Service {
         thread = new HandlerThread("gops-location"); thread.start(); handler = new Handler(thread.getLooper());
         lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE); cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         
+        lastLocationTimeMs = System.currentTimeMillis(); // نبدأ العداد
+
         if (!running) {
             instance = this; running = true;
             listener = new LocationListener() {
@@ -153,6 +167,12 @@ public class LocationForegroundService extends Service {
                 checkProviders();
                 if (core.syncDue(System.currentTimeMillis())) core.flush(false);
                 long __now = System.currentTimeMillis();
+                
+                // 👇 التحقق من مرور 15 دقيقة بدون لوكيشن
+                if (!alarmActive && (__now - lastLocationTimeMs > 15 * 60 * 1000)) {
+                    fireGpsAlarm();
+                }
+
                 if (__now - lastSelfiePollMs >= 60000L) {
                     lastSelfiePollMs = __now;
                     SelfieCheckNotifier.pollAndNotify(LocationForegroundService.this, cfgApiUrl, cfgToken, employeeId);
@@ -164,6 +184,61 @@ public class LocationForegroundService extends Service {
         }
     };
 
+    // 👇 دالة إطلاق الإنذار
+    private void fireGpsAlarm() {
+        alarmActive = true;
+        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm == null) return;
+
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationChannel ch = new NotificationChannel(ALARM_CHANNEL, "GPS Offline Alarm", NotificationManager.IMPORTANCE_HIGH);
+            ch.enableVibration(true);
+            ch.setVibrationPattern(new long[] { 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000 });
+            ch.setShowBadge(true);
+            ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            
+            Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+            if (sound == null) sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+            if (sound != null) {
+                AudioAttributes attrs = new AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .build();
+                ch.setSound(sound, attrs);
+            }
+            nm.createNotificationChannel(ch);
+        }
+
+        Intent open = getPackageManager().getLaunchIntentForPackage(getPackageName());
+        if (open == null) return;
+        open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
+        PendingIntent pi = PendingIntent.getActivity(this, 9999, open, flags);
+
+        Notification n = new NotificationCompat.Builder(this, ALARM_CHANNEL)
+            .setSmallIcon(R.drawable.ic_stat_tracking)
+            .setContentTitle("🚨 تحذير: إشارة الـ GPS مفقودة")
+            .setContentText("مر 15 دقيقة بدون إرسال موقعك. يرجى فتح التطبيق والضغط على Check GPS فوراً.")
+            .setStyle(new NotificationCompat.BigTextStyle().bigText("مر 15 دقيقة بدون إرسال موقعك. يرجى فتح التطبيق والضغط على Check GPS فوراً."))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setVibrate(new long[] { 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000 })
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setFullScreenIntent(pi, true)
+            .setAutoCancel(true)
+            .setContentIntent(pi)
+            .build();
+
+        try {
+            nm.notify(ALARM_NOTIF_ID, n);
+            Log.w("GPS_ALARM", "Fired GPS Offline Alarm!");
+        } catch (RuntimeException e) {
+            Log.w("GPS_ALARM", "Failed to fire alarm", e);
+        }
+    }
+
     private boolean hasPermission() {
         return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
             || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
@@ -172,7 +247,6 @@ public class LocationForegroundService extends Service {
     private void requestUpdates() {
         long minTime = Math.max(15000L, core == null ? 60000L : readInterval() / 2);
         try {
-            // بنسمح للـ GPS والـ Network (لأننا هنفلتر بعدين)
             if (lm.getAllProviders().contains(LocationManager.GPS_PROVIDER)) lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, minTime, 0f, listener, thread.getLooper());
             if (lm.getAllProviders().contains(LocationManager.NETWORK_PROVIDER)) lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, minTime, 0f, listener, thread.getLooper());
         } catch (SecurityException e) { if (core != null) core.setProviderState("PERMISSION_DENIED"); }
@@ -193,10 +267,18 @@ public class LocationForegroundService extends Service {
         Boolean mock = Build.VERSION.SDK_INT >= 31 ? Boolean.valueOf(l.isMock()) : Boolean.valueOf(l.isFromMockProvider());
         String p = l.getProvider(), src = LocationManager.GPS_PROVIDER.equals(p) ? "gps" : LocationManager.NETWORK_PROVIDER.equals(p) ? "network" : "fused".equals(p) ? "fused" : "unknown";
         double acc = l.hasAccuracy() ? l.getAccuracy() : 1000;
-        
-        // التطبيق هيرفض أو يقبل بناءً على فلتر الـ TrackingCore الجديد
         boolean recorded = core.onFix(new TrackingCore.Fix(t, l.getLatitude(), l.getLongitude(), acc, mock, src, batteryPercent()));
-        if (recorded && core.syncDue(System.currentTimeMillis())) core.flush(false);
+        
+        if (recorded) {
+            lastLocationTimeMs = System.currentTimeMillis(); // بنصفر العداد
+            if (alarmActive) {
+                alarmActive = false; // بنطفي الإنذار لو اللوكيشن رجع
+                NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                if (nm != null) nm.cancel(ALARM_NOTIF_ID);
+            }
+            if (core.syncDue(System.currentTimeMillis())) core.flush(false);
+        }
+        
         persist();
         if (core.shouldStop()) shutdown(null, true);
     }
@@ -217,7 +299,7 @@ public class LocationForegroundService extends Service {
             o.put("lastError", s.lastError == null ? JSONObject.NULL : s.lastError); o.put("pendingPoints", s.pending); o.put("employeeId", employeeId);
             o.put("lastFixAt", s.lastFixAt == 0 ? JSONObject.NULL : s.lastFixAt); o.put("lastSyncAt", s.lastSyncAt == 0 ? JSONObject.NULL : s.lastSyncAt);
             if (s.lastLat != null) { o.put("lastLatitude", s.lastLat); o.put("lastLongitude", s.lastLon); o.put("lastAccuracy", s.lastAccuracy); }
-            if (s.lastDistance != null) o.put("lastDistance", s.lastDistance); if (s.inside != null) o.put("inside", s.inside);
+            if (s.lastDistance != null) { o.put("lastDistance", s.lastDistance); } if (s.inside != null) { o.put("inside", s.inside); }
         } catch (JSONException e) { }
         return o;
     }
