@@ -24,6 +24,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
+import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
@@ -56,7 +57,7 @@ public class LocationForegroundService extends Service {
         JSONObject last = new TrackingPrefs(ctx).status();
         try {
             last.put("running", false); last.put("state", "STOPPED");
-            String cfg = new TrackingPrefs(ctx).config(); String emp = last.optString("employeeId", "");
+            String emp = last.optString("employeeId", "");
             if (emp.length() > 0) last.put("pendingPoints", new SqlitePointStore(ctx).count(emp));
         } catch (JSONException e) { }
         return last;
@@ -64,7 +65,7 @@ public class LocationForegroundService extends Service {
 
     @Override public void onCreate() {
         super.onCreate();
-        io = Executors.newSingleThreadExecutor(); // ننشئ الخيط في الأول
+        io = Executors.newSingleThreadExecutor();
     }
 
     @Override public IBinder onBind(Intent intent) { return null; }
@@ -80,22 +81,20 @@ public class LocationForegroundService extends Service {
             prefs = new TrackingPrefs(this); writeStatus("UNAVAILABLE", "START_NOT_ALLOWED", false); stopSelf(); return START_STICKY;
         }
         
-        if (running) return START_STICKY; // الخدمة شغالة بالفعل
+        if (running) return START_STICKY;
 
-        // 👇 بننقل دالة begin للخلفية عشان نمنع التعليق (ANR)
         if (io == null) io = Executors.newSingleThreadExecutor();
         io.execute(new Runnable() {
             @Override public void run() {
-                try { 
-                    begin(cfgJson); 
-                } catch (RuntimeException e) { 
+                try { begin(cfgJson); } 
+                catch (RuntimeException e) { 
                     writeStatus("UNAVAILABLE", "START_FAILED", false); 
                     shutdown("START_FAILED", false); 
                 }
             }
         });
         
-        return START_STICKY; // 👈 خليناها STICKY عشان النظام يحاول يرجعها لو قفلها
+        return START_STICKY;
     }
 
     private Notification buildNotification(boolean onBreak) {
@@ -125,7 +124,6 @@ public class LocationForegroundService extends Service {
         store = new SqlitePointStore(this);
         core = new TrackingCore(c, store, new HttpTransport(30000, false), new TrackingCore.Clock() { @Override public long now() { return System.currentTimeMillis(); } });
         thread = new HandlerThread("gops-location"); thread.start(); handler = new Handler(thread.getLooper());
-        // (هنا شيلنا سطر io = Executors.newSingleThreadExecutor() لأنه اتعمل في onCreate)
         lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE); cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         
         if (!running) {
@@ -175,8 +173,10 @@ public class LocationForegroundService extends Service {
     private void requestUpdates() {
         long minTime = Math.max(15000L, core == null ? 60000L : readInterval() / 2);
         try {
-            if (lm.getAllProviders().contains(LocationManager.GPS_PROVIDER)) lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, minTime, 0f, listener, thread.getLooper());
-            if (lm.getAllProviders().contains(LocationManager.NETWORK_PROVIDER)) lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, minTime, 0f, listener, thread.getLooper());
+            // 🛑 التعديل هنا: بنطلب تحديثات من الـ GPS بس، وشيلنا الـ NETWORK_PROVIDER
+            if (lm.getAllProviders().contains(LocationManager.GPS_PROVIDER)) {
+                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, minTime, 0f, listener, thread.getLooper());
+            }
         } catch (SecurityException e) { if (core != null) core.setProviderState("PERMISSION_DENIED"); }
     }
     private long readInterval() { try { return new JSONObject(prefs.config()).optLong("intervalMs", 300000); } catch (Exception e) { return 300000; } }
@@ -184,16 +184,22 @@ public class LocationForegroundService extends Service {
     private void checkProviders() {
         if (core == null || lm == null || core.isPaused()) return;
         if (!hasPermission()) { core.setProviderState("PERMISSION_DENIED"); return; }
-        boolean gps = false, net = false;
-        try { gps = lm.isProviderEnabled(LocationManager.GPS_PROVIDER); net = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER); } catch (RuntimeException e) { }
-        if (!gps && !net) core.setProviderState("GPS_DISABLED");
+        boolean gps = false;
+        try { gps = lm.isProviderEnabled(LocationManager.GPS_PROVIDER); } catch (RuntimeException e) { }
+        if (!gps) core.setProviderState("GPS_DISABLED");
     }
 
     private void handleFix(Location l) {
         if (core == null || !running) return;
+        
+        // 🛑 التعديل هنا: بنرفض أي لوكيشن جاي من الشبكة نهائياً
+        if (LocationManager.NETWORK_PROVIDER.equals(l.getProvider())) {
+            return; 
+        }
+
         long t = l.getTime() > 0 ? l.getTime() : System.currentTimeMillis();
         Boolean mock = Build.VERSION.SDK_INT >= 31 ? Boolean.valueOf(l.isMock()) : Boolean.valueOf(l.isFromMockProvider());
-        String p = l.getProvider(), src = LocationManager.GPS_PROVIDER.equals(p) ? "gps" : LocationManager.NETWORK_PROVIDER.equals(p) ? "network" : "fused".equals(p) ? "fused" : "unknown";
+        String p = l.getProvider(), src = LocationManager.GPS_PROVIDER.equals(p) ? "gps" : "unknown";
         double acc = l.hasAccuracy() ? l.getAccuracy() : 1000;
         boolean recorded = core.onFix(new TrackingCore.Fix(t, l.getLatitude(), l.getLongitude(), acc, mock, src, batteryPercent()));
         if (recorded && core.syncDue(System.currentTimeMillis())) core.flush(false);
