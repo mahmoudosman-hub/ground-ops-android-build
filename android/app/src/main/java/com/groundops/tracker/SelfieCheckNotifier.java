@@ -23,15 +23,11 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-/**
- * Polls the server for a pending selfie check and fires a native notification.
- * HIGH importance + custom adhan sound (res/raw/adhan.mp3) + long vibration.
- * Falls back to the system alarm if the mp3 is missing.
- */
 public final class SelfieCheckNotifier {
 
     private static final String TAG = "GopsSelfieNotifier";
-    private static final String CHANNEL = "gops_selfie_v4"; // bumped so old channel is discarded
+    // 👇 غيرنا اسم القناة لـ v5 عشان الأندرويد يقرا الإعدادات الجديدة
+    private static final String CHANNEL = "gops_selfie_v5"; 
     private static final int NOTIF_ID = 4712;
     private static final String PREFS = "gops_selfie_notify";
     private static final String KEY_LAST_ID = "last_notified_id";
@@ -99,7 +95,7 @@ public final class SelfieCheckNotifier {
             if (resId != 0) {
                 return Uri.parse("android.resource://" + ctx.getPackageName() + "/" + resId);
             }
-        } catch (Throwable t) { /* fall through */ }
+        } catch (Throwable t) { }
         Uri fallback = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM);
         if (fallback == null) fallback = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE);
         if (fallback == null) fallback = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION);
@@ -113,19 +109,21 @@ public final class SelfieCheckNotifier {
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationChannel ch = new NotificationChannel(
                 CHANNEL,
-                "Selfie checks (urgent)",
+                "Selfie checks (urgent v5)",
                 NotificationManager.IMPORTANCE_HIGH
             );
-            ch.setDescription("Random selfie checks during a shift - plays the adhan and vibrates");
+            ch.setDescription("Random selfie checks - plays adhan and vibrates aggressively");
             ch.enableVibration(true);
-            ch.setVibrationPattern(new long[] { 0, 800, 400, 800, 400, 800, 400, 800, 400, 800 });
+            // 👇 نمط هزاز أقوى وأطول
+            ch.setVibrationPattern(new long[] { 0, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000 });
             ch.setShowBadge(true);
+            ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
 
             Uri sound = soundUri(ctx);
             if (sound != null) {
                 AudioAttributes attrs = new AudioAttributes.Builder()
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setUsage(AudioAttributes.USAGE_ALARM) // يشتغل حتى لو الموبايل صامت
                     .build();
                 ch.setSound(sound, attrs);
             }
@@ -143,7 +141,7 @@ public final class SelfieCheckNotifier {
         PendingIntent pi = PendingIntent.getActivity(ctx, 9001, open, flags);
 
         long secondsLeft = 600;
-        try { secondsLeft = due.optLong("remaining_seconds", 600L); } catch (Exception e) { /* default */ }
+        try { secondsLeft = due.optLong("remaining_seconds", 600L); } catch (Exception e) { }
         String text = "You have about " + Math.max(0, secondsLeft / 60) + " min to take a photo.";
 
         Notification n = new NotificationCompat.Builder(ctx, CHANNEL)
@@ -154,13 +152,15 @@ public final class SelfieCheckNotifier {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
-            .setVibrate(new long[] { 0, 800, 400, 800, 400, 800, 400, 800, 400, 800 })
+            .setVibrate(new long[] { 0, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000 })
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // تظهر على شاشة القفل
+            .setFullScreenIntent(pi, true) // 👈 ده السطر السحري اللي بيخليها Pop-up
             .setAutoCancel(true)
             .setContentIntent(pi)
             .build();
 
         try {
-            nm.notify("gops_selfie_urgent", NOTIF_ID, n);
+            nm.notify("gops_selfie_urgent_v5", NOTIF_ID, n);
         } catch (RuntimeException e) { Log.w(TAG, "notify failed", e); }
     }
 
