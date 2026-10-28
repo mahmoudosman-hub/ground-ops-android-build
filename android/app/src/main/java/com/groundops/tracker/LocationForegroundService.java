@@ -24,7 +24,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
-import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
@@ -173,10 +172,9 @@ public class LocationForegroundService extends Service {
     private void requestUpdates() {
         long minTime = Math.max(15000L, core == null ? 60000L : readInterval() / 2);
         try {
-            // 🛑 التعديل هنا: بنطلب تحديثات من الـ GPS بس، وشيلنا الـ NETWORK_PROVIDER
-            if (lm.getAllProviders().contains(LocationManager.GPS_PROVIDER)) {
-                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, minTime, 0f, listener, thread.getLooper());
-            }
+            // بنسمح للـ GPS والـ Network (لأننا هنفلتر بعدين)
+            if (lm.getAllProviders().contains(LocationManager.GPS_PROVIDER)) lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, minTime, 0f, listener, thread.getLooper());
+            if (lm.getAllProviders().contains(LocationManager.NETWORK_PROVIDER)) lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, minTime, 0f, listener, thread.getLooper());
         } catch (SecurityException e) { if (core != null) core.setProviderState("PERMISSION_DENIED"); }
     }
     private long readInterval() { try { return new JSONObject(prefs.config()).optLong("intervalMs", 300000); } catch (Exception e) { return 300000; } }
@@ -184,23 +182,19 @@ public class LocationForegroundService extends Service {
     private void checkProviders() {
         if (core == null || lm == null || core.isPaused()) return;
         if (!hasPermission()) { core.setProviderState("PERMISSION_DENIED"); return; }
-        boolean gps = false;
-        try { gps = lm.isProviderEnabled(LocationManager.GPS_PROVIDER); } catch (RuntimeException e) { }
-        if (!gps) core.setProviderState("GPS_DISABLED");
+        boolean gps = false, net = false;
+        try { gps = lm.isProviderEnabled(LocationManager.GPS_PROVIDER); net = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER); } catch (RuntimeException e) { }
+        if (!gps && !net) core.setProviderState("GPS_DISABLED");
     }
 
     private void handleFix(Location l) {
         if (core == null || !running) return;
-        
-        // 🛑 التعديل هنا: بنرفض أي لوكيشن جاي من الشبكة نهائياً
-        if (LocationManager.NETWORK_PROVIDER.equals(l.getProvider())) {
-            return; 
-        }
-
         long t = l.getTime() > 0 ? l.getTime() : System.currentTimeMillis();
         Boolean mock = Build.VERSION.SDK_INT >= 31 ? Boolean.valueOf(l.isMock()) : Boolean.valueOf(l.isFromMockProvider());
-        String p = l.getProvider(), src = LocationManager.GPS_PROVIDER.equals(p) ? "gps" : "unknown";
+        String p = l.getProvider(), src = LocationManager.GPS_PROVIDER.equals(p) ? "gps" : LocationManager.NETWORK_PROVIDER.equals(p) ? "network" : "fused".equals(p) ? "fused" : "unknown";
         double acc = l.hasAccuracy() ? l.getAccuracy() : 1000;
+        
+        // التطبيق هيرفض أو يقبل بناءً على فلتر الـ TrackingCore الجديد
         boolean recorded = core.onFix(new TrackingCore.Fix(t, l.getLatitude(), l.getLongitude(), acc, mock, src, batteryPercent()));
         if (recorded && core.syncDue(System.currentTimeMillis())) core.flush(false);
         persist();
