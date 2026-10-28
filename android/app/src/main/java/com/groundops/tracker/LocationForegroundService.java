@@ -46,7 +46,7 @@ import java.util.concurrent.Executors;
 public class LocationForegroundService extends Service {
     public static final String ACTION_START = "com.groundops.tracker.START", ACTION_STOP = "com.groundops.tracker.STOP", EXTRA_CONFIG = "config";
     private static final String CHANNEL = "gops_tracking"; 
-    private static final String ALARM_CHANNEL = "gops_gps_alarm";
+    private static final String ALARM_CHANNEL = "gops_gps_alarm_v2";
     private static final int NOTIF_ID = 4711; 
     private static final int ALARM_NOTIF_ID = 9999;
     private static final long TICK_MS = 30000;
@@ -58,9 +58,8 @@ public class LocationForegroundService extends Service {
     private String cfgApiUrl = "", cfgToken = "";
     private long lastSelfiePollMs = 0L;
     
-    // 👇 متغيرات جديدة للإنذار
     private long lastLocationTimeMs = 0L;
-    private boolean alarmActive = false;
+    private long lastAlarmTimeMs = 0L;
 
     public static JSONObject snapshot(Context ctx) {
         LocationForegroundService s = instance;
@@ -137,7 +136,9 @@ public class LocationForegroundService extends Service {
         thread = new HandlerThread("gops-location"); thread.start(); handler = new Handler(thread.getLooper());
         lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE); cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         
-        lastLocationTimeMs = System.currentTimeMillis(); // نبدأ العداد
+        long now = System.currentTimeMillis();
+        lastLocationTimeMs = now;
+        lastAlarmTimeMs = now - (15 * 60 * 1000); // عشان يبدأ يعد من دلوقتي
 
         if (!running) {
             instance = this; running = true;
@@ -166,11 +167,16 @@ public class LocationForegroundService extends Service {
                 if (core.shouldStop()) { shutdown(null, true); return; }
                 checkProviders();
                 if (core.syncDue(System.currentTimeMillis())) core.flush(false);
+                
                 long __now = System.currentTimeMillis();
                 
-                // 👇 التحقق من مرور 15 دقيقة بدون لوكيشن
-                if (!alarmActive && (__now - lastLocationTimeMs > 15 * 60 * 1000)) {
-                    fireGpsAlarm();
+                // مرور 15 دقيقة من غير لوكيشن
+                if (__now - lastLocationTimeMs >= 15 * 60 * 1000) {
+                    // لوعدت 15 دقيقة كمان من آخر إنذار، نعيد الإنذار
+                    if (__now - lastAlarmTimeMs >= 15 * 60 * 1000) {
+                        fireGpsAlarm();
+                        lastAlarmTimeMs = __now;
+                    }
                 }
 
                 if (__now - lastSelfiePollMs >= 60000L) {
@@ -184,25 +190,25 @@ public class LocationForegroundService extends Service {
         }
     };
 
-    // 👇 دالة إطلاق الإنذار
     private void fireGpsAlarm() {
-        alarmActive = true;
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
         if (Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel ch = new NotificationChannel(ALARM_CHANNEL, "GPS Offline Alarm", NotificationManager.IMPORTANCE_HIGH);
+            NotificationChannel ch = new NotificationChannel(ALARM_CHANNEL, "GPS Missing Alarm", NotificationManager.IMPORTANCE_HIGH);
             ch.enableVibration(true);
-            ch.setVibrationPattern(new long[] { 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000 });
+            // اهتزاز متواصل لمدة 5 دقايق
+            ch.setVibrationPattern(new long[] { 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000 });
             ch.setShowBadge(true);
             ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             
-            Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-            if (sound == null) sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+            // نغمة الرنين الأساسية للموبايل
+            Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+            
             if (sound != null) {
                 AudioAttributes attrs = new AudioAttributes.Builder()
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE) // عشان تشتغل كأنها مكالمة
                     .build();
                 ch.setSound(sound, attrs);
             }
@@ -218,13 +224,13 @@ public class LocationForegroundService extends Service {
 
         Notification n = new NotificationCompat.Builder(this, ALARM_CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_tracking)
-            .setContentTitle("🚨 تحذير: إشارة الـ GPS مفقودة")
+            .setContentTitle("🚨 تحذير: اللوكيشن متوقف")
             .setContentText("مر 15 دقيقة بدون إرسال موقعك. يرجى فتح التطبيق والضغط على Check GPS فوراً.")
             .setStyle(new NotificationCompat.BigTextStyle().bigText("مر 15 دقيقة بدون إرسال موقعك. يرجى فتح التطبيق والضغط على Check GPS فوراً."))
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setCategory(NotificationCompat.CATEGORY_CALL) // سر السحر هنا (بتخليها تتصرف كالمكالمة)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
-            .setVibrate(new long[] { 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000 })
+            .setVibrate(new long[] { 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000 })
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setFullScreenIntent(pi, true)
             .setAutoCancel(true)
@@ -271,11 +277,10 @@ public class LocationForegroundService extends Service {
         
         if (recorded) {
             lastLocationTimeMs = System.currentTimeMillis(); // بنصفر العداد
-            if (alarmActive) {
-                alarmActive = false; // بنطفي الإنذار لو اللوكيشن رجع
-                NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-                if (nm != null) nm.cancel(ALARM_NOTIF_ID);
-            }
+            // إخفاء الإنذار لو اللوكيشن رجع
+            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) nm.cancel(ALARM_NOTIF_ID);
+            
             if (core.syncDue(System.currentTimeMillis())) core.flush(false);
         }
         
