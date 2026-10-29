@@ -3,14 +3,28 @@ package com.groundops.tracker;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.webkit.JavascriptInterface;
 import com.getcapacitor.BridgeActivity;
 import com.google.firebase.messaging.FirebaseMessaging;
 
 public class MainActivity extends BridgeActivity {
+    private String nativeFcmToken = null;
+
     @Override 
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(GopsLocationPlugin.class);
         super.onCreate(savedInstanceState);
+
+        // بنعمل جسر عشان الويب يقدر يطلب التوكن
+        if (this.getBridge() != null && this.getBridge().getWebView() != null) {
+            this.getBridge().getWebView().addJavascriptInterface(new Object() {
+                @JavascriptInterface
+                public String getNativeToken() {
+                    return nativeFcmToken;
+                }
+            }, "AndroidNative");
+        }
+
         fetchFcmToken();
     }
 
@@ -31,13 +45,12 @@ public class MainActivity extends BridgeActivity {
                 Log.w("FCM", "Fetching FCM registration token failed", task.getException());
                 return;
             }
-            String token = task.getResult();
-            Log.d("FCM", "Native FCM Token: " + token);
+            nativeFcmToken = task.getResult();
+            Log.d("FCM", "Native FCM Token: " + nativeFcmToken);
             
-            // بنبعت التوكن ده للويب عشان يبعته للسيرفر
             if (this.getBridge() != null && this.getBridge().getWebView() != null) {
                 this.getBridge().getWebView().post(() -> {
-                    this.getBridge().getWebView().evaluateJavascript("window.nativeFcmToken = '" + token + "'; console.log('Native FCM token injected');", null);
+                    this.getBridge().getWebView().evaluateJavascript("window.nativeFcmToken = '" + nativeFcmToken + "'; console.log('Native FCM token injected');", null);
                 });
             }
         });
