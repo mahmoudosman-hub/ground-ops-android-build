@@ -2,13 +2,16 @@ package com.groundops.tracker;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import com.getcapacitor.BridgeActivity;
+import com.google.firebase.messaging.FirebaseMessaging;
 
 public class MainActivity extends BridgeActivity {
     @Override 
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(GopsLocationPlugin.class);
         super.onCreate(savedInstanceState);
+        fetchFcmToken();
     }
 
     @Override
@@ -20,5 +23,23 @@ public class MainActivity extends BridgeActivity {
             startService(intent);
             SelfieCheckNotifier.stopAlarm(this);
         } catch (Exception e) { }
+    }
+
+    private void fetchFcmToken() {
+        FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
+            if (!task.isSuccessful()) {
+                Log.w("FCM", "Fetching FCM registration token failed", task.getException());
+                return;
+            }
+            String token = task.getResult();
+            Log.d("FCM", "Native FCM Token: " + token);
+            
+            // بنبعت التوكن ده للويب عشان يبعته للسيرفر
+            if (this.getBridge() != null && this.getBridge().getWebView() != null) {
+                this.getBridge().getWebView().post(() -> {
+                    this.getBridge().getWebView().evaluateJavascript("window.nativeFcmToken = '" + token + "'; console.log('Native FCM token injected');", null);
+                });
+            }
+        });
     }
 }
