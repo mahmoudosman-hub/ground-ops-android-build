@@ -8,14 +8,14 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override 
     public void onCreate(Bundle savedInstanceState) {
-        registerPlugin(GopsLocationPlugin.class); // must be registered before super.onCreate
+        registerPlugin(GopsLocationPlugin.class);
         super.onCreate(savedInstanceState);
     }
 
     @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
-        // 👇 ده السطر اللي بيبعت إشارة للخدمة تقولها "اقفل الإنذار"
+        // ده السطر اللي بيبعت إشارة للخدمة تقولها "اقفل الإنذار"
         try {
             Intent intent = new Intent(this, LocationForegroundService.class);
             intent.setAction(LocationForegroundService.ACTION_RESUME);
