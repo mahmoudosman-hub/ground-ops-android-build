@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "295865086509",
+    "project_id": "ground-ops-tracker",
+    "storage_bucket": "ground-ops-tracker.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:295865086509:android:8a04238e4cd0babb7e3ea4",
+        "android_client_info": {
+          "package_name": "com.groundops.tracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDiVSlX6zKfuNx0U6AiUKjVIp7gnGBL0O0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
