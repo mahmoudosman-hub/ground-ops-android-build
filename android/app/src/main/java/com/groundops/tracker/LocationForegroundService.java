@@ -1,5 +1,6 @@
 package com.groundops.tracker;
 
+import android.Manifest;
 import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -92,12 +93,11 @@ public class LocationForegroundService extends Service {
         String action = intent.getAction();
         
         if (ACTION_STOP.equals(action)) { 
-            stopAlarm(); // إيقاف الصوت لو شغال
+            stopAlarm();
             shutdown("STOP_REQUESTED", false); 
             return START_STICKY; 
         }
         
-        // لما التطبيق يفتح، بنقطع الإنذار
         if (ACTION_RESUME.equals(action)) {
             stopAlarm();
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
@@ -219,7 +219,6 @@ public class LocationForegroundService extends Service {
         else am.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pi);
     }
 
-    // 👇 دالة تشغيل الإنذار (نغمة رنين + هزاز + إضاءة شاشة)
     private void fireGpsAlarm() {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
@@ -232,7 +231,6 @@ public class LocationForegroundService extends Service {
             nm.createNotificationChannel(ch);
         }
 
-        // إيقاظ الشاشة
         try {
             PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
             if (pm != null && !pm.isInteractive()) {
@@ -241,7 +239,6 @@ public class LocationForegroundService extends Service {
             }
         } catch (Exception e) {}
 
-        // تشغيل نغمة الرنين والهزاز
         stopAlarm();
         try {
             alarmPlayer = new MediaPlayer();
