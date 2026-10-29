@@ -14,6 +14,9 @@ import android.content.pm.ServiceInfo;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.media.AudioAttributes;
+import android.media.MediaPlayer;
+import android.media.RingtoneManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
@@ -24,6 +27,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
+import android.os.PowerManager;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
@@ -41,76 +47,70 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class LocationForegroundService extends Service {
-    public static final String ACTION_START = "com.groundops.tracker.START"; 
-    public static final String ACTION_STOP = "com.groundops.tracker.STOP";
-    public static final String EXTRA_CONFIG = "config";
-    public static final String ACTION_ALARM_CHECK = "GPS_ALARM_CHECK";
-    
+    public static final String ACTION_START = "com.groundops.tracker.START", ACTION_STOP = "com.groundops.tracker.STOP", EXTRA_CONFIG = "config";
+    public static final String ACTION_RESUME = "com.groundops.tracker.RESUME";
     private static final String CHANNEL = "gops_tracking"; 
-    private static final String ALARM_CHANNEL = "gops_gps_alarm_v3";
+    private static final String ALARM_CHANNEL = "gops_gps_alarm_v4";
     private static final int NOTIF_ID = 4711; 
     private static final int ALARM_NOTIF_ID = 9999;
     private static final int ALARM_REQUEST_CODE = 555;
     private static final long TICK_MS = 30000;
-    
     public static volatile LocationForegroundService instance;
 
-    private TrackingCore core; 
-    private TrackingPrefs prefs; 
-    private SqlitePointStore store; 
-    private LocationManager lm; 
-    private ConnectivityManager cm;
-    private HandlerThread thread; 
-    private Handler handler; 
-    private ExecutorService io; 
-    private LocationListener listener; 
-    private ConnectivityManager.NetworkCallback netCb;
-    
-    private volatile boolean running; 
-    private String employeeId = "";
+    private TrackingCore core; private TrackingPrefs prefs; private SqlitePointStore store; private LocationManager lm; private ConnectivityManager cm;
+    private HandlerThread thread; private Handler handler; private ExecutorService io; private LocationListener listener; private ConnectivityManager.NetworkCallback netCb;
+    private volatile boolean running; private String employeeId = "";
     private String cfgApiUrl = "", cfgToken = "";
     private long lastSelfiePollMs = 0L;
     private long lastLocationTimeMs = 0L;
+    
+    private static MediaPlayer alarmPlayer = null;
+    private static Vibrator alarmVibrator = null;
 
     public static JSONObject snapshot(Context ctx) {
         LocationForegroundService s = instance;
         if (s != null && s.running && s.core != null) return s.statusJson(true);
         JSONObject last = new TrackingPrefs(ctx).status();
         try {
-            last.put("running", false); 
-            last.put("state", "STOPPED");
+            last.put("running", false); last.put("state", "STOPPED");
             String emp = last.optString("employeeId", "");
             if (emp.length() > 0) last.put("pendingPoints", new SqlitePointStore(ctx).count(emp));
         } catch (JSONException e) { }
         return last;
     }
 
-    @Override 
-    public void onCreate() {
+    @Override public void onCreate() {
         super.onCreate();
         io = Executors.newSingleThreadExecutor();
     }
 
-    @Override 
-    public IBinder onBind(Intent intent) { return null; }
+    @Override public IBinder onBind(Intent intent) { return null; }
 
     @Override 
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) return START_STICKY;
-        
         String action = intent.getAction();
         
         if (ACTION_STOP.equals(action)) { 
+            stopAlarm(); // إيقاف الصوت لو شغال
             shutdown("STOP_REQUESTED", false); 
             return START_STICKY; 
         }
         
-        if (ACTION_ALARM_CHECK.equals(action)) {
+        // لما التطبيق يفتح، بنقطع الإنذار
+        if (ACTION_RESUME.equals(action)) {
+            stopAlarm();
+            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) nm.cancel(ALARM_NOTIF_ID);
+            return START_STICKY;
+        }
+        
+        if ("GPS_ALARM_CHECK".equals(action)) {
             long __now = System.currentTimeMillis();
             if (__now - lastLocationTimeMs >= 15 * 60 * 1000) {
                 fireGpsAlarm();
             }
-            scheduleAlarm(); // نعيد ضبط المنبه للـ 15 دقيقة اللي جاية
+            scheduleAlarm();
             return START_STICKY;
         }
         
@@ -182,7 +182,7 @@ public class LocationForegroundService extends Service {
                 try { cm.registerNetworkCallback(new NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), netCb); } catch (RuntimeException e) { netCb = null; }
             }
             handler.postDelayed(tick, TICK_MS);
-            scheduleAlarm(); // تشغيل المنبه
+            scheduleAlarm();
             io.execute(new Runnable() { @Override public void run() { checkProviders(); core.flush(true); persist(); } });
             persist();
         }
@@ -196,7 +196,6 @@ public class LocationForegroundService extends Service {
                 if (core.shouldStop()) { shutdown(null, true); return; }
                 checkProviders();
                 if (core.syncDue(System.currentTimeMillis())) core.flush(false);
-                
                 long __now = System.currentTimeMillis();
                 if (__now - lastSelfiePollMs >= 60000L) {
                     lastSelfiePollMs = __now;
@@ -213,16 +212,14 @@ public class LocationForegroundService extends Service {
         AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         if (am == null) return;
         Intent intent = new Intent(this, LocationForegroundService.class);
-        intent.setAction(ACTION_ALARM_CHECK);
+        intent.setAction("GPS_ALARM_CHECK");
         PendingIntent pi = PendingIntent.getService(this, ALARM_REQUEST_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         long triggerTime = System.currentTimeMillis() + 15 * 60 * 1000;
-        if (Build.VERSION.SDK_INT >= 23) {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pi);
-        } else {
-            am.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pi);
-        }
+        if (Build.VERSION.SDK_INT >= 23) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pi);
+        else am.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pi);
     }
 
+    // 👇 دالة تشغيل الإنذار (نغمة رنين + هزاز + إضاءة شاشة)
     private void fireGpsAlarm() {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
@@ -235,7 +232,33 @@ public class LocationForegroundService extends Service {
             nm.createNotificationChannel(ch);
         }
 
-        GopsAlarm.start(this);
+        // إيقاظ الشاشة
+        try {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null && !pm.isInteractive()) {
+                PowerManager.WakeLock wl = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.ON_AFTER_RELEASE, "GpsAlarm:WakeLock");
+                wl.acquire(10000);
+            }
+        } catch (Exception e) {}
+
+        // تشغيل نغمة الرنين والهزاز
+        stopAlarm();
+        try {
+            alarmPlayer = new MediaPlayer();
+            alarmPlayer.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
+            alarmPlayer.setDataSource(this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE));
+            alarmPlayer.setLooping(true);
+            alarmPlayer.prepare();
+            alarmPlayer.start();
+
+            alarmVibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            if (alarmVibrator != null && alarmVibrator.hasVibrator()) {
+                long[] pattern = { 0, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000 };
+                if (Build.VERSION.SDK_INT >= 26) alarmVibrator.vibrate(VibrationEffect.createWaveform(pattern, 0));
+                else alarmVibrator.vibrate(pattern, 0);
+            }
+            handler.postDelayed(new Runnable() { @Override public void run() { stopAlarm(); } }, 5 * 60 * 1000);
+        } catch (Exception e) { Log.w("GPS_ALARM", "Failed to start alarm", e); }
 
         Intent open = getPackageManager().getLaunchIntentForPackage(getPackageName());
         if (open == null) return;
@@ -245,28 +268,21 @@ public class LocationForegroundService extends Service {
         PendingIntent pi = PendingIntent.getActivity(this, 9999, open, flags);
 
         Notification n = new NotificationCompat.Builder(this, ALARM_CHANNEL)
-            .setSmallIcon(R.drawable.ic_stat_tracking)
-            .setContentTitle("🚨 تحذير: اللوكيشن متوقف")
+            .setSmallIcon(R.drawable.ic_stat_tracking).setContentTitle("🚨 تحذير: اللوكيشن متوقف")
             .setContentText("مر 15 دقيقة بدون إرسال موقعك. يرجى فتح التطبيق والضغط على Check GPS فوراً.")
-            .setStyle(new NotificationCompat.BigTextStyle().bigText("مر 15 دقيقة بدون إرسال موقعك. يرجى فتح التطبيق والضغط على Check GPS فوراً."))
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_CALL)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setFullScreenIntent(pi, true)
-            .setAutoCancel(true)
-            .setContentIntent(pi)
-            .build();
+            .setPriority(NotificationCompat.PRIORITY_MAX).setCategory(NotificationCompat.CATEGORY_CALL)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC).setFullScreenIntent(pi, true).setAutoCancel(true).setContentIntent(pi).build();
+        try { nm.notify(ALARM_NOTIF_ID, n); } catch (RuntimeException e) { }
+    }
 
-        try {
-            nm.notify(ALARM_NOTIF_ID, n);
-        } catch (RuntimeException e) {
-            Log.w("GPS_ALARM", "Failed to fire alarm", e);
-        }
+    private void stopAlarm() {
+        if (alarmPlayer != null) { try { alarmPlayer.stop(); alarmPlayer.release(); } catch (Exception e) {} alarmPlayer = null; }
+        if (alarmVibrator != null) { try { alarmVibrator.cancel(); } catch (Exception e) {} alarmVibrator = null; }
     }
 
     private boolean hasPermission() {
-        return ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-            || ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            || ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
     private void requestUpdates() {
@@ -293,16 +309,14 @@ public class LocationForegroundService extends Service {
         String p = l.getProvider(), src = LocationManager.GPS_PROVIDER.equals(p) ? "gps" : LocationManager.NETWORK_PROVIDER.equals(p) ? "network" : "fused".equals(p) ? "fused" : "unknown";
         double acc = l.hasAccuracy() ? l.getAccuracy() : 1000;
         boolean recorded = core.onFix(new TrackingCore.Fix(t, l.getLatitude(), l.getLongitude(), acc, mock, src, batteryPercent()));
-        
         if (recorded) {
             lastLocationTimeMs = System.currentTimeMillis();
-            GopsAlarm.stop(); // بنطفي الإنذار لو اللوكيشن رجع
+            stopAlarm();
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (nm != null) nm.cancel(ALARM_NOTIF_ID);
-            scheduleAlarm(); // بنعيد ضبط المنبه من جديد
+            scheduleAlarm();
             if (core.syncDue(System.currentTimeMillis())) core.flush(false);
         }
-        
         persist();
         if (core.shouldStop()) shutdown(null, true);
     }
