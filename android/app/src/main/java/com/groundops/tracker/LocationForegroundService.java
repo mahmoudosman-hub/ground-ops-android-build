@@ -51,7 +51,7 @@ public class LocationForegroundService extends Service {
     public static final String ACTION_START = "com.groundops.tracker.START", ACTION_STOP = "com.groundops.tracker.STOP", EXTRA_CONFIG = "config";
     public static final String ACTION_RESUME = "com.groundops.tracker.RESUME";
     private static final String CHANNEL = "gops_tracking"; 
-    private static final String ALARM_CHANNEL = "gops_gps_alarm_v99"; // 👈 قناة جديدة لكسر الكاش
+    private static final String ALARM_CHANNEL = "gops_gps_alarm_v99";
     private static final int NOTIF_ID = 4711; 
     private static final int ALARM_NOTIF_ID = 9999;
     private static final int ALARM_REQUEST_CODE = 555;
@@ -107,7 +107,8 @@ public class LocationForegroundService extends Service {
         
         if ("GPS_ALARM_CHECK".equals(action)) {
             long __now = System.currentTimeMillis();
-            if (__now - lastLocationTimeMs >= 15 * 60 * 1000) {
+            // لو مر 10 دقايق من غير لوكيشن، بنشغل الإنذار
+            if (__now - lastLocationTimeMs >= 10 * 60 * 1000) {
                 fireGpsAlarm();
             }
             scheduleAlarm();
@@ -214,7 +215,7 @@ public class LocationForegroundService extends Service {
         Intent intent = new Intent(this, LocationForegroundService.class);
         intent.setAction("GPS_ALARM_CHECK");
         PendingIntent pi = PendingIntent.getService(this, ALARM_REQUEST_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        long triggerTime = System.currentTimeMillis() + 15 * 60 * 1000;
+        long triggerTime = System.currentTimeMillis() + 10 * 60 * 1000; // كل 10 دقايق
         if (Build.VERSION.SDK_INT >= 23) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pi);
         else am.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pi);
     }
@@ -223,7 +224,6 @@ public class LocationForegroundService extends Service {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
-        // 1. إنشاء القناة الجديدة عشان الصوت يشتغل أوتوماتيك
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationChannel ch = new NotificationChannel(ALARM_CHANNEL, "GPS Missing Alarm", NotificationManager.IMPORTANCE_HIGH);
             ch.setShowBadge(true);
@@ -238,7 +238,6 @@ public class LocationForegroundService extends Service {
             nm.createNotificationChannel(ch);
         }
 
-        // 2. إيقاظ الشاشة
         try {
             PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
             if (pm != null && !pm.isInteractive()) {
@@ -247,7 +246,6 @@ public class LocationForegroundService extends Service {
             }
         } catch (Exception e) {}
 
-        // 3. تشغيل الصوت والهزاز المتواصل (كاحتياطي إضافي)
         stopAlarm();
         try {
             alarmPlayer = new MediaPlayer();
@@ -266,7 +264,6 @@ public class LocationForegroundService extends Service {
             handler.postDelayed(new Runnable() { @Override public void run() { stopAlarm(); } }, 5 * 60 * 1000);
         } catch (Exception e) { Log.w("GPS_ALARM", "Failed to start alarm", e); }
 
-        // 4. إظهار الشاشة الكاملة (Full Screen)
         Intent open = getPackageManager().getLaunchIntentForPackage(getPackageName());
         if (open == null) return;
         open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
@@ -276,7 +273,7 @@ public class LocationForegroundService extends Service {
 
         Notification n = new NotificationCompat.Builder(this, ALARM_CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_tracking).setContentTitle("🚨 تحذير: اللوكيشن متوقف")
-            .setContentText("مر 15 دقيقة بدون إرسال موقعك. يرجى فتح التطبيق والضغط على Check GPS فوراً.")
+            .setContentText("مر 10 دقائق بدون إرسال موقعك. يرجى فتح التطبيق والضغط على Check GPS فوراً.")
             .setPriority(NotificationCompat.PRIORITY_MAX).setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC).setFullScreenIntent(pi, true).setAutoCancel(true).setContentIntent(pi).build();
         try { nm.notify(ALARM_NOTIF_ID, n); } catch (RuntimeException e) { }
