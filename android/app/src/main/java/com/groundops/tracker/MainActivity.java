@@ -14,13 +14,10 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
-        // إشارة للخدمة تقولها "اقفل الإنذار" لما الكابتن يفتح التطبيق
         try {
             Intent intent = new Intent(this, LocationForegroundService.class);
             intent.setAction(LocationForegroundService.ACTION_RESUME);
             startService(intent);
-            
-            // كمان نقفل صوت السيلفي لو شغال
             SelfieCheckNotifier.stopAlarm(this);
         } catch (Exception e) { }
     }
