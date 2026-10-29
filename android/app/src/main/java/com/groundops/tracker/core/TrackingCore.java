@@ -37,7 +37,7 @@ public final class TrackingCore {
         public String state = "STOPPED", lastError, endedReason;
         public long lastFixAt, lastSyncAt;
         public int pending;
-        public Double lastLat, lastLon, lastAccuracy, lastDistance; // 👈 هنا الاسم الصح
+        public Double lastLat, lastLon, lastAccuracy, lastDistance;
         public Boolean inside;
     }
 
@@ -65,25 +65,12 @@ public final class TrackingCore {
 
     public synchronized boolean onFix(Fix f) {
         if (ended || paused) return false;
-        
-        // 1. رفض اللوكيشن اللي دقته وحشة جداً (أكبر من 100 متر)
-        if (f.accuracy > 100) {
-            lastError = "BAD_ACCURACY";
-            return false; 
-        }
-
-        // 2. فلتر الانتقال الآني (Teleportation Filter)
+        if (f.accuracy > 100) { lastError = "BAD_ACCURACY"; return false; }
         if (lastRecordedTs > 0) {
             long timeDiffMs = f.timeMs - lastRecordedTs;
             double distMoved = distanceMeters(lastRecLat, lastRecLon, f.lat, f.lon);
-            
-            // لو الوقت اللي فات أقل من دقيقة، والمسافة أكبر من 150 متر (مستحيل تمشيها في دقيقة)، نرفض اللوكيشن ده
-            if (timeDiffMs > 0 && timeDiffMs < 60000 && distMoved > 150) {
-                lastError = "TELEPORTATION_BLOCKED";
-                return false;
-            }
+            if (timeDiffMs > 0 && timeDiffMs < 60000 && distMoved > 150) { lastError = "TELEPORTATION_BLOCKED"; return false; }
         }
-
         lastFixAt = clock.now(); lastLat = f.lat; lastLon = f.lon; lastAcc = f.accuracy; providerState = null;
         if (lastRecordedTs >= 0) {
             long gap = f.timeMs - lastRecordedTs;
@@ -108,12 +95,10 @@ public final class TrackingCore {
 
     public synchronized void setPaused(boolean p) { if (paused && !p) { lastRecordedTs = -1; providerState = null; } paused = p; }
     public synchronized boolean isPaused() { return paused; }
-
     public synchronized void setProviderState(String state) {
         providerState = state;
         if (state != null && !state.equals(reportedState)) { reportedState = state; reportStateToServer(state); }
     }
-
     private void reportStateToServer(String state) {
         try { transport.post(cfg.apiUrl, "{\"action\":\"submitLocation\",\"token\":" + MiniJson.quote(cfg.token) + ",\"payload\":{\"tracking_state\":" + MiniJson.quote(state) + "},\"client\":\"android-native/1.0\"}"); }
         catch (IOException e) { }
@@ -154,7 +139,12 @@ public final class TrackingCore {
             String code = String.valueOf(json.get("error_code"));
             if ("NO_ACTIVE_SHIFT".equals(code)) { store.clear(cfg.employeeId); return end("SHIFT_OVER", code, sent); }
             if ("INVALID_SESSION".equals(code) || "SESSION_EXPIRED".equals(code) || "FORBIDDEN".equals(code) || "PASSWORD_CHANGE_REQUIRED".equals(code)) { store.clear(cfg.employeeId); return end("SESSION_ENDED", code, sent); }
-            if ("VALIDATION_ERROR".equals(code) || "REQUEST_TOO_LARGE".equals(code) || "TRACKING_DISABLED".equals(code)) { store.delete(ids); lastError = code; sent += 0; continue; }
+            
+            // 👇 هنا التعديل: ضفنا TELEPORTATION_BLOCKED عشان يمسح اللوكيشن من الطابور
+            if ("VALIDATION_ERROR".equals(code) || "REQUEST_TOO_LARGE".equals(code) || "TRACKING_DISABLED".equals(code) || "TELEPORTATION_BLOCKED".equals(code)) { 
+                store.delete(ids); lastError = code; sent += 0; continue; 
+            }
+            
             return backoff(code, sent);
         }
     }
@@ -178,10 +168,7 @@ public final class TrackingCore {
         long now = clock.now();
         s.ended = ended; s.endedReason = endedReason; s.lastError = lastError;
         s.running = serviceRunning && !ended; s.lastFixAt = lastFixAt; s.lastSyncAt = lastSyncAt; s.pending = store.count(cfg.employeeId);
-        
-        // 👇 التعديل هنا: غيرنا s.lastAcc إلى s.lastAccuracy
         s.lastLat = lastLat; s.lastLon = lastLon; s.lastAccuracy = lastAcc; s.lastDistance = lastDistance; s.inside = inside;
-        
         if (!s.running) s.state = "STOPPED";
         else if (paused) s.state = "ON_BREAK";
         else if (providerState != null) s.state = providerState;
