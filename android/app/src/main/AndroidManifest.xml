@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Hardware: the app still installs on devices without these (it then reports tracking as unavailable). -->
+    <!-- Hardware -->
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.front" android:required="false" />
@@ -10,24 +10,26 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Location while the app is in use. ACCESS_BACKGROUND_LOCATION is deliberately NOT requested:
-         the tracking foreground service is started from the visible app and keeps its access. -->
+    <!-- Location -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Foreground service of type "location" (required on Android 9+/14+) and its visible notification (Android 13+). -->
+    <!-- Foreground service and notifications -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- 👇 السطر الجديد ده عشان نسمح بالإشعار يظهر كـ Popup فوق الشاشة -->
+    <!-- Full Screen Intent (Popup) -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
-    <!-- 👇 الصلاحيات الجديدة اللي ضفناها للمنبه (AlarmManager) وإيقاظ الشاشة (WakeLock) -->
+    <!-- Alarm and WakeLock -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- Selfie at check-in (live camera only; no photo-library access). -->
+    <!-- 👇 الصلاحية اللي بتخلي الموبايل يهز -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Camera -->
     <uses-permission android:name="android.permission.CAMERA" />
 
     <application
