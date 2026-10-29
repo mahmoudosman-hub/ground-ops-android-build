@@ -5,7 +5,6 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 
@@ -38,14 +37,11 @@ public class GopsFirebaseMessagingService extends FirebaseMessagingService {
         final String finalTitle = title;
         final String finalBody = body;
 
-        // بنشغل الخدمة في الخلفية عشان نسأل السيرفر
+        // بنشغل الخدمة في الخلفية عشان نسأل السيرفر هل الكابتن لسه في الشيفت؟
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    SharedPreferences prefs = new SharedPreferences() {
-                        // ... (مش هنحتاجها هنا، هنقرا من TrackingPrefs)
-                    };
                     TrackingPrefs trackingPrefs = new TrackingPrefs(GopsFirebaseMessagingService.this);
                     String configStr = trackingPrefs.config();
                     if (configStr == null || configStr.isEmpty()) return;
@@ -56,12 +52,13 @@ public class GopsFirebaseMessagingService extends FirebaseMessagingService {
 
                     if (apiUrl.isEmpty() || token.isEmpty()) return;
 
-                    // بنسأل السيرفر: هل الكابتن لسه شغال؟
                     URL url = new URL(apiUrl);
                     HttpURLConnection c = (HttpURLConnection) url.openConnection();
                     c.setRequestMethod("POST");
                     c.setRequestProperty("Content-Type", "text/plain;charset=utf-8");
                     c.setDoOutput(true);
+                    c.setConnectTimeout(10000);
+                    c.setReadTimeout(10000);
                     
                     String requestBody = "{\"action\":\"getTodaySchedule\",\"token\":\"" + token + "\",\"payload\":{},\"client\":\"android-service\"}";
                     try (OutputStream os = c.getOutputStream()) {
