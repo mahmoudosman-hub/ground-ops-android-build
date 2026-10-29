@@ -31,7 +31,7 @@ import java.nio.charset.StandardCharsets;
 
 public final class SelfieCheckNotifier {
     private static final String TAG = "GopsSelfieNotifier";
-    private static final String CHANNEL = "gops_selfie_v8";
+    private static final String CHANNEL = "gops_selfie_v99"; // 👈 قناة جديدة
     private static final int NOTIF_ID = 4712;
     private static final String PREFS = "gops_selfie_notify";
     private static final String KEY_LAST_ID = "last_notified_id";
@@ -113,10 +113,18 @@ public final class SelfieCheckNotifier {
         if (nm == null) return;
 
         if (Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel ch = new NotificationChannel(CHANNEL, "Selfie checks (urgent v8)", NotificationManager.IMPORTANCE_HIGH);
+            NotificationChannel ch = new NotificationChannel(CHANNEL, "Selfie checks (urgent v99)", NotificationManager.IMPORTANCE_HIGH);
             ch.setShowBadge(true);
             ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-            ch.setSound(null, null); // الصوت هيشتغل من الميديا بلاير
+            ch.enableVibration(true);
+            ch.setVibrationPattern(new long[]{0, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000});
+            
+            // سر السحر: نستخدم الملف الصوتي (adhan) ونربطه بالقناة عشان يشتغل أوتوماتيك
+            Uri sound = soundUri(ctx);
+            if (sound != null) {
+                AudioAttributes attrs = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
+                ch.setSound(sound, attrs);
+            }
             nm.createNotificationChannel(ch);
         }
 
@@ -129,17 +137,18 @@ public final class SelfieCheckNotifier {
             }
         } catch (Exception e) {}
 
-        // 2. تشغيل الأذان + الهزاز (لوب لمدة 5 دقايق)
+        // 2. تشغيل الصوت والهزاز المتواصل
         stopAlarm(ctx);
         try {
             mediaPlayer = new MediaPlayer();
             mediaPlayer.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
-            int resId = ctx.getResources().getIdentifier("adhan", "raw", ctx.getPackageName());
-            if (resId != 0) mediaPlayer.setDataSource(ctx, Uri.parse("android.resource://" + ctx.getPackageName() + "/" + resId));
-            else mediaPlayer.setDataSource(ctx, android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM));
-            mediaPlayer.setLooping(true);
-            mediaPlayer.prepare();
-            mediaPlayer.start();
+            Uri soundUri = soundUri(ctx);
+            if (soundUri != null) {
+                mediaPlayer.setDataSource(ctx, soundUri);
+                mediaPlayer.setLooping(true);
+                mediaPlayer.prepare();
+                mediaPlayer.start();
+            }
 
             vibrator = (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
             if (vibrator != null && vibrator.hasVibrator()) {
@@ -147,7 +156,6 @@ public final class SelfieCheckNotifier {
                 if (Build.VERSION.SDK_INT >= 26) vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0));
                 else vibrator.vibrate(pattern, 0);
             }
-
             handler.postDelayed(new Runnable() { @Override public void run() { stopAlarm(ctx); } }, 5 * 60 * 1000);
         } catch (Exception e) { Log.w(TAG, "Failed to start alarm", e); }
 
@@ -166,8 +174,18 @@ public final class SelfieCheckNotifier {
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(text)).setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_CALL).setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setFullScreenIntent(pi, true).setAutoCancel(true).setContentIntent(pi).build();
-            try { nm.notify("gops_selfie_urgent_v8", NOTIF_ID, n); } catch (RuntimeException e) { }
+            try { nm.notify("gops_selfie_urgent_v99", NOTIF_ID, n); } catch (RuntimeException e) { }
         }
+    }
+
+    private static Uri soundUri(Context ctx) {
+        try {
+            int resId = ctx.getResources().getIdentifier("adhan", "raw", ctx.getPackageName());
+            if (resId != 0) {
+                return Uri.parse("android.resource://" + ctx.getPackageName() + "/" + resId);
+            }
+        } catch (Throwable t) {}
+        return android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM);
     }
 
     private static String esc(String s) {
