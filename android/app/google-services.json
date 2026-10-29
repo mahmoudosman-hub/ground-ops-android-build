@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:295865086509:android:8a04238e4cd0babb7e3ea4",
+        "mobilesdk_app_id": "1:295865086509:android:5585c1add98243877e3ea4",
         "android_client_info": {
-          "package_name": "com.groundops.tracker"
+          "package_name": "com.groundops.tracker1"
         }
       },
       "oauth_client": [],
