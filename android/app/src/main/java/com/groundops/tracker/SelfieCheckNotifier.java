@@ -31,7 +31,7 @@ import java.nio.charset.StandardCharsets;
 
 public final class SelfieCheckNotifier {
     private static final String TAG = "GopsSelfieNotifier";
-    private static final String CHANNEL = "gops_selfie_v99"; // 👈 قناة جديدة
+    private static final String CHANNEL = "gops_selfie_v99";
     private static final int NOTIF_ID = 4712;
     private static final String PREFS = "gops_selfie_notify";
     private static final String KEY_LAST_ID = "last_notified_id";
@@ -118,8 +118,6 @@ public final class SelfieCheckNotifier {
             ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             ch.enableVibration(true);
             ch.setVibrationPattern(new long[]{0, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000});
-            
-            // سر السحر: نستخدم الملف الصوتي (adhan) ونربطه بالقناة عشان يشتغل أوتوماتيك
             Uri sound = soundUri(ctx);
             if (sound != null) {
                 AudioAttributes attrs = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
@@ -128,7 +126,6 @@ public final class SelfieCheckNotifier {
             nm.createNotificationChannel(ch);
         }
 
-        // 1. إيقاظ الشاشة
         try {
             PowerManager pm = (PowerManager) ctx.getSystemService(Context.POWER_SERVICE);
             if (pm != null && !pm.isInteractive()) {
@@ -137,7 +134,6 @@ public final class SelfieCheckNotifier {
             }
         } catch (Exception e) {}
 
-        // 2. تشغيل الصوت والهزاز المتواصل
         stopAlarm(ctx);
         try {
             mediaPlayer = new MediaPlayer();
@@ -159,7 +155,6 @@ public final class SelfieCheckNotifier {
             handler.postDelayed(new Runnable() { @Override public void run() { stopAlarm(ctx); } }, 5 * 60 * 1000);
         } catch (Exception e) { Log.w(TAG, "Failed to start alarm", e); }
 
-        // 3. إظهار الإشعار
         Intent open = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName());
         if (open != null) {
             open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
