@@ -12,7 +12,19 @@
   }
 
   async function registerNativeToken() {
-    if (window.nativeFcmToken) {
+    var token = null;
+    
+    // 1. بنجرب نجيب التوكن من الجسر بتاع الجافا
+    if (window.AndroidNative && typeof window.AndroidNative.getNativeToken === 'function') {
+        token = window.AndroidNative.getNativeToken();
+    } 
+    
+    // 2. لو الجسر لسه مرجعش، بنجرب المتغير العادي
+    if (!token && window.nativeFcmToken) {
+        token = window.nativeFcmToken;
+    }
+
+    if (token && token !== 'null' && token !== '') {
       var sess = getSession();
       var apiUrl = window.API_URL || window.GOPS_CONFIG?.API_URL || window.CONFIG?.API_URL;
       
@@ -24,7 +36,7 @@
             body: JSON.stringify({
               action: 'registerPushToken',
               token: sess.token,
-              payload: { token: window.nativeFcmToken },
+              payload: { token: token },
               client: 'native-app/1.0'
             })
           });
@@ -35,6 +47,7 @@
         }
       }
     } else {
+      // لو الجافا لسه مبعتهاش، نستنى ثانيتين ونجرب تاني
       setTimeout(registerNativeToken, 2000);
     }
   }
