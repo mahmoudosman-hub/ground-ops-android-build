@@ -51,7 +51,7 @@ public class LocationForegroundService extends Service {
     public static final String ACTION_START = "com.groundops.tracker.START", ACTION_STOP = "com.groundops.tracker.STOP", EXTRA_CONFIG = "config";
     public static final String ACTION_RESUME = "com.groundops.tracker.RESUME";
     private static final String CHANNEL = "gops_tracking"; 
-    private static final String ALARM_CHANNEL = "gops_gps_alarm_v4";
+    private static final String ALARM_CHANNEL = "gops_gps_alarm_v99"; // 👈 قناة جديدة لكسر الكاش
     private static final int NOTIF_ID = 4711; 
     private static final int ALARM_NOTIF_ID = 9999;
     private static final int ALARM_REQUEST_CODE = 555;
@@ -223,14 +223,22 @@ public class LocationForegroundService extends Service {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
+        // 1. إنشاء القناة الجديدة عشان الصوت يشتغل أوتوماتيك
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationChannel ch = new NotificationChannel(ALARM_CHANNEL, "GPS Missing Alarm", NotificationManager.IMPORTANCE_HIGH);
             ch.setShowBadge(true);
             ch.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-            ch.setSound(null, null); 
+            ch.enableVibration(true);
+            ch.setVibrationPattern(new long[]{0, 1000, 500, 1000, 500, 1000, 500, 1000, 500, 1000});
+            android.net.Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+            if (soundUri != null) {
+                AudioAttributes attrs = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
+                ch.setSound(soundUri, attrs);
+            }
             nm.createNotificationChannel(ch);
         }
 
+        // 2. إيقاظ الشاشة
         try {
             PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
             if (pm != null && !pm.isInteractive()) {
@@ -239,6 +247,7 @@ public class LocationForegroundService extends Service {
             }
         } catch (Exception e) {}
 
+        // 3. تشغيل الصوت والهزاز المتواصل (كاحتياطي إضافي)
         stopAlarm();
         try {
             alarmPlayer = new MediaPlayer();
@@ -257,6 +266,7 @@ public class LocationForegroundService extends Service {
             handler.postDelayed(new Runnable() { @Override public void run() { stopAlarm(); } }, 5 * 60 * 1000);
         } catch (Exception e) { Log.w("GPS_ALARM", "Failed to start alarm", e); }
 
+        // 4. إظهار الشاشة الكاملة (Full Screen)
         Intent open = getPackageManager().getLaunchIntentForPackage(getPackageName());
         if (open == null) return;
         open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
