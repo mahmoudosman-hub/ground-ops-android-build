@@ -107,8 +107,8 @@ public class LocationForegroundService extends Service {
         
         if ("GPS_ALARM_CHECK".equals(action)) {
             long __now = System.currentTimeMillis();
-            // لو مر 10 دقايق من غير لوكيشن، بنشغل الإنذار
-            if (__now - lastLocationTimeMs >= 10 * 60 * 1000) {
+            // v1.0.9: لو مرّت 15 دقيقة من غير لوكيشن، بنشغّل الإنذار (كانت 10 والكابتنز اشتكوا من كترتها)
+            if (__now - lastLocationTimeMs >= 15 * 60 * 1000) {
                 fireGpsAlarm();
             }
             scheduleAlarm();
@@ -215,7 +215,7 @@ public class LocationForegroundService extends Service {
         Intent intent = new Intent(this, LocationForegroundService.class);
         intent.setAction("GPS_ALARM_CHECK");
         PendingIntent pi = PendingIntent.getService(this, ALARM_REQUEST_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        long triggerTime = System.currentTimeMillis() + 10 * 60 * 1000; // كل 10 دقايق
+        long triggerTime = System.currentTimeMillis() + 15 * 60 * 1000; // v1.0.9: كل 15 دقيقة (كانت 10)
         if (Build.VERSION.SDK_INT >= 23) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pi);
         else am.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pi);
     }
@@ -273,7 +273,7 @@ public class LocationForegroundService extends Service {
 
         Notification n = new NotificationCompat.Builder(this, ALARM_CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_tracking).setContentTitle("🚨 تحذير: اللوكيشن متوقف")
-            .setContentText("مر 10 دقائق بدون إرسال موقعك. يرجى فتح التطبيق والضغط على Check GPS فوراً.")
+            .setContentText("مرّت 15 دقيقة بدون إرسال موقعك. يرجى فتح التطبيق والضغط على Check GPS فوراً.")
             .setPriority(NotificationCompat.PRIORITY_MAX).setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC).setFullScreenIntent(pi, true).setAutoCancel(true).setContentIntent(pi).build();
         try { nm.notify(ALARM_NOTIF_ID, n); } catch (RuntimeException e) { }
