@@ -35,7 +35,8 @@ function createWebTracker({ api, provider, queue, userId, getSettings, onChange,
             halt = true;
             if (e.code === 'NO_ACTIVE_SHIFT') { await queue.clear(userId); st.pending = 0; st.ended = true; st.error = e.code; await stop(); }
             else if (['INVALID_SESSION', 'SESSION_EXPIRED', 'FORBIDDEN'].includes(e.code)) { st.error = e.code; await stop(); }
-            else if (['VALIDATION_ERROR', 'REQUEST_TOO_LARGE', 'TRACKING_DISABLED'].includes(e.code)) { await queue.remove(items.map((i) => i.id)); st.error = e.code; } // never loop on a bad batch
+            // إصلاح 1.0.7: نقاط رفضها السيرفر نهائياً (منها الوهم والقديم) تُمسح من الطابور — بدل ما تتعاد للأبد وتسد النقاط الأحدث
+            else if (['VALIDATION_ERROR', 'REQUEST_TOO_LARGE', 'TRACKING_DISABLED', 'TELEPORTATION_BLOCKED', 'MOCK_LOCATION_REJECTED', 'STALE_LOCATION'].includes(e.code)) { await queue.remove(items.map((i) => i.id)); st.error = e.code; } // never loop on a bad batch
             else st.error = e.code; // OFFLINE / NETWORK_ERROR / SERVER_UNAVAILABLE / RATE_LIMITED / SERVER_BUSY: keep the points, retry on the next sample or when back online
           }
         }
