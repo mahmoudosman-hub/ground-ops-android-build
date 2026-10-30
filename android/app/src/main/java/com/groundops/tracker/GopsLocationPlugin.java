@@ -30,8 +30,11 @@ import com.getcapacitor.annotation.PermissionCallback;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 @CapacitorPlugin(name = "GopsLocation", permissions = {
@@ -62,51 +65,95 @@ public class GopsLocationPlugin extends Plugin {
         JSObject o = new JSObject(); o.put("location", locationState()); o.put("notifications", NotificationManagerCompat.from(ctx()).areNotificationsEnabled()); call.resolve(o);
     }
 
+    /**
+     * تحديث 1.0.7: بيجيب الموقع من المصدرين مع بعض (GPS + شبكة) بدل مصدر واحد،
+     * بيختار الأدق، وبيقبل الجودة المطلوبة مبكراً بدل الانتظار للنهاية،
+     * وعند انتهاء المهلة بيرجع أفضل إحداثي متاح بدل فشل كامل — الواجهة هي اللي تحكم عليه.
+     */
     @PluginMethod public void getCurrentPosition(final PluginCall call) {
         if (!hasLocation()) { call.reject("Location permission denied", "PERMISSION_DENIED"); return; }
         final LocationManager lm = (LocationManager) ctx().getSystemService(Context.LOCATION_SERVICE);
         final long timeout = call.getLong("timeoutMs", 10000L); // 10 ثواني
-        String provider = null;
-        try { 
-            if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                provider = LocationManager.GPS_PROVIDER;
-            } else if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                provider = LocationManager.NETWORK_PROVIDER;
-            }
-        } catch (RuntimeException e) { provider = null; }
-        
-        if (provider == null) { call.reject("GPS is switched off or not available. Please turn on Location.", "GPS_DISABLED"); return; }
-        
-        final AtomicBoolean done = new AtomicBoolean(false);
-        final Handler main = new Handler(Looper.getMainLooper());
+        Double requested = call.getDouble("maxAccuracyMeters");
+        final double targetAcc = (requested == null || requested < 1) ? 150.0 : requested;
+        boolean gpsEnabled = false, netEnabled = false;
         try {
-            if (Build.VERSION.SDK_INT >= 30) {
-                final CancellationSignal cs = new CancellationSignal();
-                main.postDelayed(new Runnable() { 
-                    @Override public void run() { 
-                        cs.cancel(); 
-                        finish(call, done, null); // 👈 التعديل هنا: بنرجع إيرور للواجهة غصب عنها
-                    } 
-                }, timeout);
-                Executor ex = ContextCompat.getMainExecutor(ctx());
-                lm.getCurrentLocation(provider, cs, ex, new Consumer<Location>() { @Override public void accept(Location l) { finish(call, done, l); } });
-            } else {
-                final android.location.LocationListener one = new android.location.LocationListener() {
-                    @Override public void onLocationChanged(Location l) { finish(call, done, l); }
-                    @Override public void onProviderDisabled(String p) { }
-                    @Override public void onProviderEnabled(String p) { }
-                    @Override public void onStatusChanged(String p, int s, android.os.Bundle e) { }
-                };
-                lm.requestSingleUpdate(provider, one, Looper.getMainLooper());
-                main.postDelayed(new Runnable() { @Override public void run() { try { lm.removeUpdates(one); } catch (RuntimeException e) { } finish(call, done, null); } }, timeout);
+            gpsEnabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
+            netEnabled = lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+        } catch (RuntimeException e) { }
+        final boolean gpsOn = gpsEnabled, netOn = netEnabled; // final عشان تُستخدم جوه الـ anonymous classes
+        if (!gpsOn && !netOn) { call.reject("GPS is switched off or not available. Please turn on Location.", "GPS_DISABLED"); return; }
+
+        final AtomicBoolean done = new AtomicBoolean(false);
+        final AtomicReference<Location> best = new AtomicReference<Location>(null);
+        final List<CancellationSignal> signals = new ArrayList<CancellationSignal>();
+        final List<android.location.LocationListener> singles = new ArrayList<android.location.LocationListener>();
+        final Handler main = new Handler(Looper.getMainLooper());
+
+        // إلغاء كل الطلبات المعلقة (تُستدعى من الموضوع الرئيسي فقط)
+        final Runnable cleanup = new Runnable() { @Override public void run() {
+            main.removeCallbacksAndMessages(null);
+            for (CancellationSignal s : signals) { try { s.cancel(); } catch (RuntimeException e) { } }
+            signals.clear();
+            for (android.location.LocationListener l : singles) { try { lm.removeUpdates(l); } catch (RuntimeException e) { } }
+            singles.clear();
+        }};
+        // استقبال إحداثي: احتفظ بالأدق، وانهِ مبكراً عند بلوغ الجودة المطلوبة
+        final Consumer<Location> offer = new Consumer<Location>() { @Override public void accept(Location l) {
+            if (l == null || done.get()) return;
+            double acc = l.hasAccuracy() ? l.getAccuracy() : 1000;
+            Location cur = best.get();
+            if (cur == null || (cur.hasAccuracy() ? cur.getAccuracy() : 1000) > acc) best.set(l);
+            if (acc <= targetAcc && done.compareAndSet(false, true)) { cleanup.run(); resolveFix(call, l); }
+        }};
+        final Runnable onTimeout = new Runnable() { @Override public void run() {
+            if (!done.compareAndSet(false, true)) return;
+            Location b = best.get();
+            cleanup.run();
+            if (b != null) resolveFix(call, b); // أفضل إحداثي متاح بدل فشل كامل — الواجهة تقرر
+            else call.reject("No GPS fix in time. Move to an open area and try again.", "TIMEOUT");
+        }};
+        main.postDelayed(onTimeout, timeout);
+
+        // كل التسجيلات على الموضوع الرئيسي عشان القوايم تبقى confined لموضوع واحد
+        main.post(new Runnable() { @Override public void run() {
+            if (done.get()) return;
+            try {
+                if (Build.VERSION.SDK_INT >= 30) {
+                    Executor ex = ContextCompat.getMainExecutor(ctx());
+                    if (gpsOn) {
+                        final CancellationSignal s1 = new CancellationSignal(); signals.add(s1);
+                        lm.getCurrentLocation(LocationManager.GPS_PROVIDER, s1, ex, new Consumer<Location>() { @Override public void accept(Location l) { offer.accept(l); } });
+                    }
+                    if (netOn) {
+                        final CancellationSignal s2 = new CancellationSignal(); signals.add(s2);
+                        lm.getCurrentLocation(LocationManager.NETWORK_PROVIDER, s2, ex, new Consumer<Location>() { @Override public void accept(Location l) { offer.accept(l); } });
+                    }
+                } else {
+                    final android.location.LocationListener one = new android.location.LocationListener() {
+                        @Override public void onLocationChanged(Location l) { offer.accept(l); }
+                        @Override public void onProviderDisabled(String p) { }
+                        @Override public void onProviderEnabled(String p) { }
+                        @Override public void onStatusChanged(String p, int s, android.os.Bundle e) { }
+                    };
+                    singles.add(one);
+                    if (gpsOn) lm.requestSingleUpdate(LocationManager.GPS_PROVIDER, one, Looper.getMainLooper());
+                    if (netOn) lm.requestSingleUpdate(LocationManager.NETWORK_PROVIDER, one, Looper.getMainLooper());
+                }
+            } catch (RuntimeException e) {
+                if (done.compareAndSet(false, true)) {
+                    cleanup.run();
+                    Location b = best.get();
+                    if (b != null) resolveFix(call, b);
+                    else call.reject("Location permission denied", "PERMISSION_DENIED");
+                }
             }
-        } catch (SecurityException e) { call.reject("Location permission denied", "PERMISSION_DENIED"); }
+        }});
     }
-    
-    private void finish(PluginCall call, AtomicBoolean done, Location l) {
-        if (!done.compareAndSet(false, true)) return;
-        if (l == null) { call.reject("No GPS fix in time. Move to an open area and try again.", "TIMEOUT"); return; }
-        JSObject o = new JSObject(); o.put("latitude", l.getLatitude()); o.put("longitude", l.getLongitude()); o.put("accuracy", l.hasAccuracy() ? l.getAccuracy() : 1000);
+
+    private void resolveFix(PluginCall call, Location l) {
+        JSObject o = new JSObject();
+        o.put("latitude", l.getLatitude()); o.put("longitude", l.getLongitude()); o.put("accuracy", l.hasAccuracy() ? l.getAccuracy() : 1000);
         o.put("timestamp", l.getTime() > 0 ? l.getTime() : System.currentTimeMillis()); o.put("isMock", Build.VERSION.SDK_INT >= 31 ? l.isMock() : l.isFromMockProvider());
         String p = l.getProvider(); o.put("source", LocationManager.GPS_PROVIDER.equals(p) ? "gps" : LocationManager.NETWORK_PROVIDER.equals(p) ? "network" : "fused".equals(p) ? "fused" : "unknown");
         call.resolve(o);
@@ -158,6 +205,8 @@ public class GopsLocationPlugin extends Plugin {
         ActivityManager am = (ActivityManager) ctx().getSystemService(Context.ACTIVITY_SERVICE);
         o.put("backgroundRestricted", Build.VERSION.SDK_INT >= 28 && am != null ? am.isBackgroundRestricted() : JSONObject.NULL);
         o.put("sdkInt", Build.VERSION.SDK_INT); o.put("manufacturer", Build.MANUFACTURER); o.put("model", Build.MODEL);
+        // 0=مغلق 1=GPS فقط 2=توفير طاقة (شبكة) 3=دقة عالية — 1 هو المؤشر على بقايا إعدادات تطبيقات الوهم
+        try { o.put("locationMode", Settings.Secure.getInt(ctx().getContentResolver(), Settings.Secure.LOCATION_MODE)); } catch (Exception e) { o.put("locationMode", JSONObject.NULL); }
         call.resolve(o);
     }
 

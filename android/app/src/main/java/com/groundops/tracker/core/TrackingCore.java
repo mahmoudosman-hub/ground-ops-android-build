@@ -141,7 +141,10 @@ public final class TrackingCore {
             if ("INVALID_SESSION".equals(code) || "SESSION_EXPIRED".equals(code) || "FORBIDDEN".equals(code) || "PASSWORD_CHANGE_REQUIRED".equals(code)) { store.clear(cfg.employeeId); return end("SESSION_ENDED", code, sent); }
             
             // 👇 هنا التعديل: ضفنا TELEPORTATION_BLOCKED عشان يمسح اللوكيشن من الطابور
-            if ("VALIDATION_ERROR".equals(code) || "REQUEST_TOO_LARGE".equals(code) || "TRACKING_DISABLED".equals(code) || "TELEPORTATION_BLOCKED".equals(code)) { 
+            // 👇 تحديث 1.0.7: MOCK_LOCATION_REJECTED و STALE_LOCATION كمان — نقاط رفضها السيرفر نهائياً
+            // متمسحش من الطابور = إعادة إرسال للأبد تسد النقاط الأحدث (ts ASC)
+            if ("VALIDATION_ERROR".equals(code) || "REQUEST_TOO_LARGE".equals(code) || "TRACKING_DISABLED".equals(code) || "TELEPORTATION_BLOCKED".equals(code)
+                    || "MOCK_LOCATION_REJECTED".equals(code) || "STALE_LOCATION".equals(code)) { 
                 store.delete(ids); lastError = code; sent += 0; continue; 
             }
             

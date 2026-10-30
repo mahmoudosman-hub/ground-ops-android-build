@@ -7,6 +7,7 @@ import { openModal, button, spinner } from '../../components/ui.js';
 import { startCamera, stopCamera, captureToJpeg, fileToImage, CameraError } from '../../services/camera.js';
 
 const isOnline = () => !(globalThis.navigator && globalThis.navigator.onLine === false);
+const GPS_HINT = 'If this keeps happening: in phone Settings > Location, set Location mode to High accuracy and turn Wi-Fi on. Indoor signal is often weak - step outside and tap Retry.';
 const LOC_HELP = {
   PERMISSION_DENIED: 'Location permission is blocked. Allow location for this app in your browser/phone settings (Android: lock icon > Permissions; iPhone: Settings > Privacy > Location Services > Safari Websites), then tap Retry.',
   GPS_DISABLED: 'Your location is unavailable. Turn on GPS / Location Services and make sure you have a signal, then tap Retry.',
@@ -33,12 +34,12 @@ export function openCheckIn({ api, provider, schedule, onDone }) {
     cleanup(); modal.setBody(spinner(t('Getting your location...')));
     try {
       if (provider.capabilities.nativeSync && (await provider.permission()) !== 'granted') { if ((await provider.requestPermission()) !== 'granted') throw Object.assign(new Error('denied'), { state: 'PERMISSION_DENIED' }); }
-      fix = await provider.getPosition({ timeoutMs: 25000 });
+      fix = await provider.getPosition({ timeoutMs: 25000, maxAccuracyMeters: maxAcc });
     }
-    catch (e) { return fail(t('Location problem'), t(LOC_HELP[e.state] || LOC_HELP.UNAVAILABLE), null, stepLocation); }
+    catch (e) { return fail(t('Location problem'), t(LOC_HELP[e.state] || LOC_HELP.UNAVAILABLE), h('p', { class: 'hint' }, t(GPS_HINT)), stepLocation); }
     const dist = haversineMeters(fix.latitude, fix.longitude, branch.latitude, branch.longitude), d = Math.round(dist);
     const rows = infoRows([['Assigned branch', branch.branch_name], ['Current distance', `${d} meters`], ['Required', `Within ${radius} meters`], ['GPS accuracy', `${Math.round(fix.accuracy)} meters`]]);
-    if (fix.accuracy > maxAcc) return fail(t('GPS accuracy is too low'), t('Accuracy is {a} m but {m} m or better is required. Move to an open area and retry.', { a: Math.round(fix.accuracy), m: maxAcc }), rows, stepLocation);
+    if (fix.accuracy > maxAcc) return fail(t('GPS accuracy is too low'), t('Accuracy is {a} m but {m} m or better is required. Move to an open area and retry.', { a: Math.round(fix.accuracy), m: maxAcc }) + ' ' + t(GPS_HINT), rows, stepLocation);
     if (dist > radius) return fail(t('You are outside the assigned branch.'), '', rows, stepLocation);
     modal.setBody(h('div', { class: 'alert alert-ok' }, '✔ ', t('You are inside the branch area.')), rows,
       h('div', { class: 'form-actions' }, button(t('Cancel'), { on: { click: () => modal.close() } }), button(needSelfie ? t('Continue to selfie') : t('Check in now'), { kind: 'primary', big: true, id: 'btn-continue', on: { click: needSelfie ? stepCamera : submit } })));
@@ -75,7 +76,7 @@ export function openCheckIn({ api, provider, schedule, onDone }) {
     } catch (e) {
       if (e.code === 'OUTSIDE_GEOFENCE') { const d = e.details || {}; return fail(t('You are outside the assigned branch.'), '', infoRows([['Current distance', `${Math.round(d.distance_meters)} meters`], ['Required', `Within ${d.required_within_meters} meters`]]), stepLocation); }
       if (['STALE_LOCATION', 'LOW_ACCURACY', 'GPS_UNAVAILABLE'].includes(e.code)) return fail(t('Location problem'), errorMessage(e), null, stepLocation);
-      if (e.state) return fail(t('Location problem'), t(LOC_HELP[e.state] || LOC_HELP.UNAVAILABLE), null, submit);
+      if (e.state) return fail(t('Location problem'), t(LOC_HELP[e.state] || LOC_HELP.UNAVAILABLE), h('p', { class: 'hint' }, t(GPS_HINT)), submit);
       if (['OFFLINE', 'NETWORK_ERROR', 'SERVER_UNAVAILABLE'].includes(e.code)) return fail(t('Not checked in'), t('{m} Nothing was recorded. Please try again.', { m: errorMessage(e) }), null, submit);
       fail(t('Check-in failed'), errorMessage(e), null, ['DUPLICATE_CHECKIN', 'NO_ASSIGNMENT', 'ON_LEAVE', 'CHECKIN_WINDOW_CLOSED'].includes(e.code) ? null : submit);
     }
@@ -92,7 +93,7 @@ export function openCheckOut({ api, provider, schedule, onDone }) {
   const fail = (title, msg, extra, retry) => modal.setBody(h('div', { class: 'alert alert-bad', role: 'alert' }, h('strong', {}, title), h('p', {}, msg)), extra || null, h('div', { class: 'form-actions' }, button(t('Close'), { on: { click: () => modal.close() } }), retry ? button(t('Retry'), { kind: 'primary', on: { click: retry } }) : null));
   async function locate() {
     cleanup(); modal.setBody(spinner(t('Getting your location...')));
-    try { fix = await provider.getPosition({ timeoutMs: 25000 }); } catch (e) { return fail(t('Location problem'), t(LOC_HELP[e.state] || LOC_HELP.UNAVAILABLE), null, locate); }
+    try { fix = await provider.getPosition({ timeoutMs: 25000, maxAccuracyMeters: st.gps_accuracy_threshold_meters || 50 }); } catch (e) { return fail(t('Location problem'), t(LOC_HELP[e.state] || LOC_HELP.UNAVAILABLE), h('p', { class: 'hint' }, t(GPS_HINT)), locate); }
     const d = Math.round(haversineMeters(fix.latitude, fix.longitude, branch.latitude, branch.longitude)), outside = d > radius;
     modal.setBody(outside ? h('div', { class: 'alert alert-warn' }, t('You are {d} m from the branch (limit {r} m). Your supervisor will see this.', { d, r: radius })) : h('div', { class: 'alert alert-ok' }, '✔ ', t('You are inside the branch area.')),
       h('p', {}, needSelfie ? t('A selfie is required to end your shift.') : t('End your shift now?')), h('div', { class: 'form-actions' }, button(t('Cancel'), { on: { click: () => modal.close() } }),
