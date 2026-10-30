@@ -153,13 +153,38 @@
 
   var startY = null, THRESHOLD = 80, REFRESHING = false;
 
+  // d54: منع «السحب-للتحديث» بالغلط — الكود كان بيفحص سكرول الصفحة بس، فأي سكرول جوه نافذة الإشعارات
+  // (أو أي قايمة بتسكرول جواها) كان بيتفهم سحب-للتحديث والتطبيق يعيد تحميل نفسه بالغلط.
+  // من دلوقتي: أي لمسة جوه نافذة مودال أو جوه أي قايمة بتسكرول = مفيش سحب-للتحديث خالص.
+  function inModal(e) { try { return !!(e.target && e.target.closest && e.target.closest('.overlay')); } catch (err) { return false; } }
+  function inInnerScroller(e) {
+    try {
+      var el = e.target;
+      while (el && el !== document.body) {
+        if (el.nodeType === 1) {
+          var cs = window.getComputedStyle(el);
+          if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && el.scrollHeight > el.clientHeight) return true;
+        }
+        el = el.parentNode;
+      }
+    } catch (err) {}
+    return false;
+  }
+  function hideIndicator() {
+    try {
+      var el = document.getElementById('gops-ptr-indicator');
+      if (el) { el.classList.remove('gops-show'); el.style.transform = 'translateX(-50%) translateY(-60px)'; }
+    } catch (err) {}
+  }
+
   document.addEventListener('touchstart', function (e) {
-    if (REFRESHING || window.scrollY > 4 || !e.touches || !e.touches.length) return;
+    if (REFRESHING || inModal(e) || inInnerScroller(e) || window.scrollY > 4 || !e.touches || !e.touches.length) return;
     startY = e.touches[0].clientY;
   }, { passive: true });
 
   document.addEventListener('touchmove', function (e) {
     if (startY === null || REFRESHING || !e.touches || !e.touches.length) return;
+    if (inModal(e) || inInnerScroller(e)) { startY = null; hideIndicator(); return; } // d54: دخل نافذة/قايمة أثناء السحب؟ ألغِ فورًا
     var y = e.touches[0].clientY, delta = y - startY;
     if (delta > 0 && window.scrollY <= 2) {
       var el = buildIndicator();
@@ -186,8 +211,7 @@
       clearAllCache(); // Pull-to-refresh = clear cache + reload
       setTimeout(function () { window.location.reload(); }, 300);
     } else {
-      el.classList.remove('gops-show');
-      el.style.transform = 'translateX(-50%) translateY(-60px)';
+      hideIndicator(); // d54: السحب ما وصلش للعتبة — اخفِ المؤشر بدل ما يفضل عايق على الشاشة
     }
     startY = null;
   }, { passive: true });

@@ -107,6 +107,17 @@ public class LocationForegroundService extends Service {
         
         if ("GPS_ALARM_CHECK".equals(action)) {
             long __now = System.currentTimeMillis();
+            // v1.4.0 حارس «مفيش شيفت»: أول ما الكابتن يعمل Check-Out (أو الشيفت يخلص/فشل التشغيل) الـ config بيتمسح من الجهاز.
+            // العيب القديم: المنبه كان بيفضل مسجل في AlarmManager بتاع نظام الأندرويد بعد الـ Check-Out،
+            // فيرن كل 15 دقيقة (كانت 10) بـ «اللوكيشن متوقف» لحد ما الكابتن يعمل Force Close.
+            // من دلوقتي: مفيش config = مفيش شيفت شغال = نلغي سلسلة المنبه نهائيًا ونطفي أي صوت/إشعار شغال.
+            if (prefs == null) prefs = new TrackingPrefs(this);
+            String __cfg = prefs.config();
+            if (__cfg == null || __cfg.trim().isEmpty()) {
+                cancelGpsAlarmChain();
+                stopSelf();
+                return START_NOT_STICKY;
+            }
             // v1.3.0: أثناء البريك مفيش إرسال لوكيشن متوقع — الإنذار ممنوع يرن (كان بيرن بعد 15 دقيقة بريك ويخوّف الكابتن)
             TrackingCore coreSnap = core;
             boolean pausedNow = coreSnap != null && coreSnap.isPaused();
@@ -367,8 +378,28 @@ public class LocationForegroundService extends Service {
         try { JSONObject o = new JSONObject(); o.put("running", false); o.put("state", state); o.put("lastError", error); o.put("ended", ended); o.put("pendingPoints", 0); prefs.saveStatus(o); } catch (JSONException e) { }
     }
 
+    // v1.4.0: إلغاء سلسلة منبه الـ GPS بالكامل: المنبه المسجل في AlarmManager (نظام الأندرويد) + صوت الرن + إشعار «اللوكيشن متوقف».
+    // بتتنادى من shutdown() أي وقت التتبع بيوقف (Check-Out / نهاية الشيفت / فشل التشغيل / خدمة اتقفلت) — عشان المنبه عمره ما يصحى بعد الخروج.
+    private void cancelGpsAlarmChain() {
+        try {
+            AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            if (am != null) {
+                Intent i = new Intent(this, LocationForegroundService.class);
+                i.setAction("GPS_ALARM_CHECK");
+                PendingIntent pi = PendingIntent.getService(this, ALARM_REQUEST_CODE, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                am.cancel(pi);
+            }
+        } catch (Exception e) { Log.w("GPS_ALARM", "cancel alarm failed", e); }
+        stopAlarm();
+        try {
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (nm != null) nm.cancel(ALARM_NOTIF_ID);
+        } catch (Exception e) { }
+    }
+
     private synchronized void shutdown(String reason, boolean ended) {
         boolean wasRunning = running; running = false;
+        cancelGpsAlarmChain(); // v1.4.0: التتبع وقف = منبه الـ GPS يتلغى من نظام الأندرويد فورًا (كان بيفضل شغال بعد الـ Check-Out)
         BubbleOverlay.hide(this); // v1.1.0: قفل الشيفت = الفقاعة تختفي
         try { if (lm != null && listener != null) lm.removeUpdates(listener); } catch (RuntimeException e) { }
         try { if (cm != null && netCb != null) cm.unregisterNetworkCallback(netCb); } catch (RuntimeException e) { }

@@ -65,7 +65,7 @@
       'transition:background .2s'
     ].join(';');
     b.innerHTML = '<span id="gops-pray-ic">🕌</span> <span id="gops-pray-tx">بريك الصلاة</span>';
-    var req = document.getElementById('tab-requests');
+    var req = document.getElementById('btn-tabs-refresh') || document.getElementById('tab-requests'); // d54: بعد زرار ⟳ الجديد لو موجود عشان الترتيب يبقى: الطلبات ← ⟳ ← الصلاة
     if (req && req.parentNode === tabs) req.insertAdjacentElement('afterend', b);
     else tabs.appendChild(b);
     return b;

@@ -76,6 +76,7 @@ input, select, textarea { font: inherit; min-height: var(--tap); padding: 8px 10
 }
 /* tabs, schedule and requests */
 .tabs { display: flex; gap: 6px; margin: 0 0 10px; flex-wrap: wrap; } .tabs .btn.active { background: var(--brand, #1565c0); color: #fff; }
+.tabs .tab-refresh { flex: 0 0 auto; min-width: 42px; padding-inline: 12px; font-size: 1.15rem; font-weight: 800; } /* d54: زرار ⟳ جنب «الطلبات» */
 .sched-list, .req-list { list-style: none; padding: 0; margin: 0; } .sched-list li, .req-list li { padding: 8px 0; border-bottom: 1px solid var(--line); } .sched-list li.today { background: rgba(21, 101, 192, .08); } .sched-list .day { display: inline-block; min-width: 7.5em; font-weight: 600; } .req p { margin: .25rem 0; }
 .proof-view img { max-width: 100%; height: auto; }
 /* notification bell + break card */

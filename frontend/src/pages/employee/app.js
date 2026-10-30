@@ -59,8 +59,11 @@ export function mountEmployeeApp(root, deps = {}) {
     home = createHome({ api, provider, queue }); sched = createScheduleView({ api }); reqs = createRequestsView({ api, onChange: () => { if (home) home.refresh(); } });
     const boxes = { home: h('div', { id: 'view-home' }, home.el), schedule: h('div', { id: 'view-schedule', hidden: true }, sched.el), requests: h('div', { id: 'view-requests', hidden: true }, reqs.el) };
     const tabs = [['home', 'Home'], ['schedule', 'My schedule'], ['requests', 'Requests']].map(([k, label]) => button(t(label), { id: `tab-${k}`, small: true, on: { click: () => show(k) } }));
+    // d54: زرار ⟳ الصغير جنب تاب «الطلبات» — الريفرش اليدوي الرسمي (ضغطة واحدة = تنظيف الكاش + تحديث) بدل السحب-للتحديث اللي كان بيشتغل بالغلط وسط الإشعارات
+    const refreshBtn = button('⟳', { id: 'btn-tabs-refresh', small: true, class: 'tab-refresh', aria: t('Refresh'), on: { click: () => { try { if (globalThis.window && window.gopsClearCache) window.gopsClearCache(); } catch (e) {} globalThis.location.reload(); } } });
+    refreshBtn.title = t('Refresh');
     function show(k) { Object.keys(boxes).forEach((n) => { boxes[n].hidden = n !== k; }); tabs.forEach((b, i) => { const on = ['home', 'schedule', 'requests'][i] === k; b.classList.toggle('active', on); b.setAttribute('aria-current', on ? 'page' : 'false'); }); if (k === 'schedule') sched.refresh(); if (k === 'requests') reqs.refresh(); else if (k === 'home' && home) home.refresh(); }
-    mount(body, h('nav', { class: 'tabs', id: 'tabs', 'aria-label': t('Sections') }, ...tabs), boxes.home, boxes.schedule, boxes.requests); show('home');
+    mount(body, h('nav', { class: 'tabs', id: 'tabs', 'aria-label': t('Sections') }, ...tabs, refreshBtn), boxes.home, boxes.schedule, boxes.requests); show('home');
   }
   view();
   return { api, view, get home() { return home; } };
