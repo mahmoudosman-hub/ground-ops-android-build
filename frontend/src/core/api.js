@@ -50,7 +50,15 @@ export function createApi(kind, opts = {}) {
       store.set({ token: data.token, expires_at: data.expires_at, user: data.user }, kind === 'employee' && !!remember);
       return data.user;
     },
-    async logout() { try { await call('logout', {}); } catch (e) { /* offline/expired: still clear locally */ } store.clear(); },
+    async logout() {
+      // إلغاء توكن الإشعارات لهذا الجهاز قبل الخروج — عشان الإشعارات تتوقف فوراً على الموبايل ده
+      let fcm = '';
+      try { fcm = globalThis.localStorage ? (localStorage.getItem('gops.fcm.token') || '') : ''; } catch (e) {}
+      if (fcm) { try { await call('unregisterPushToken', { token: fcm }); } catch (e) { /* best effort */ } }
+      try { if (globalThis.localStorage) localStorage.removeItem('gops.fcm.token'); } catch (e) {}
+      try { if (globalThis.localStorage) localStorage.removeItem('gops.fcm.state'); } catch (e) {}
+      try { await call('logout', {}); } catch (e) { /* offline/expired: still clear locally */ } store.clear();
+    },
     async changePassword(current_password, new_password) { await call('changePassword', { current_password, new_password }); store.update({ user: { ...store.get().user, must_change_password: false } }); },
     async refreshUser() { const d = await call('getCurrentUser', {}); store.update({ user: d.user }); return d.user; }
   };
