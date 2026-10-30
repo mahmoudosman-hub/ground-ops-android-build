@@ -186,7 +186,18 @@ public class LocationForegroundService extends Service {
             scheduleAlarm();
             io.execute(new Runnable() { @Override public void run() { checkProviders(); core.flush(true); persist(); } });
             persist();
+            // v1.1.0: ظهّر فقاعة الماسنجر طول ما الشيفت شغال (ضغطة = يفتح التطبيق / ضغطة مطوّلة = يبعت اللوكيشن)
+            BubbleOverlay.show(this, sendNowAction());
         }
+    }
+
+    /** v1.1.0: ضغطة مطوّلة على الفقاعة = تبعت النقاط المخزنة (آخر لوكيشن) للسيرفر فوراً. */
+    private BubbleOverlay.SendNow sendNowAction() {
+        return new BubbleOverlay.SendNow() { @Override public void run() {
+            io.execute(new Runnable() { @Override public void run() {
+                try { if (core != null) { core.flush(true); persist(); } } catch (Throwable t) { }
+            } });
+        } };
     }
 
     private final Runnable tick = new Runnable() {
@@ -197,6 +208,8 @@ public class LocationForegroundService extends Service {
                 if (core.shouldStop()) { shutdown(null, true); return; }
                 checkProviders();
                 if (core.syncDue(System.currentTimeMillis())) core.flush(false);
+                // v1.1.0: لو الفقاعة اختفت أو الإذن اتمنح من شوية — نصلح الوضع لوحنا كل 30 ثانية
+                BubbleOverlay.ensure(LocationForegroundService.this, sendNowAction());
                 long __now = System.currentTimeMillis();
                 if (__now - lastSelfiePollMs >= 60000L) {
                     lastSelfiePollMs = __now;
@@ -353,6 +366,7 @@ public class LocationForegroundService extends Service {
 
     private synchronized void shutdown(String reason, boolean ended) {
         boolean wasRunning = running; running = false;
+        BubbleOverlay.hide(this); // v1.1.0: قفل الشيفت = الفقاعة تختفي
         try { if (lm != null && listener != null) lm.removeUpdates(listener); } catch (RuntimeException e) { }
         try { if (cm != null && netCb != null) cm.unregisterNetworkCallback(netCb); } catch (RuntimeException e) { }
         if (handler != null) handler.removeCallbacksAndMessages(null);
@@ -371,6 +385,8 @@ public class LocationForegroundService extends Service {
             if (core == null || core.isPaused()) return;
             try { if (lm != null && listener != null) lm.removeUpdates(listener); } catch (RuntimeException e) { }
             core.setPaused(true); showNotification(true); persist();
+            // v1.1.0: أثناء بريك الصلاة الفقاعة تختفي (مفيش تتبع = مفيش إرسال موقع)
+            BubbleOverlay.hide(LocationForegroundService.this);
         } });
     }
 
@@ -379,6 +395,8 @@ public class LocationForegroundService extends Service {
         io.execute(new Runnable() { @Override public void run() {
             if (core == null || !core.isPaused()) return;
             core.setPaused(false); requestUpdates(); showNotification(false); persist();
+            // v1.1.0: رجعنا من البريك — الفقاعة ترجع تظهر
+            BubbleOverlay.show(LocationForegroundService.this, sendNowAction());
         } });
     }
 
