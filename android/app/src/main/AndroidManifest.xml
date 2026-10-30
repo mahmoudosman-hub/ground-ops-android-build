@@ -19,6 +19,10 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- v1.1.0: فقاعة عائمة زي الماسنجر فوق باقي التطبيقات أثناء الشيفت -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- v1.2.0: شاشة التجهيز — «السماح طوال الوقت» عشان التتبع يفضل شغال في الخلفية -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- v1.2.0: زرار «البطارية بدون قيود» في شاشة التجهيز -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:allowBackup="false"
