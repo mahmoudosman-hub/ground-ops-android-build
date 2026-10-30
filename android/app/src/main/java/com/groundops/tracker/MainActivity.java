@@ -1,6 +1,9 @@
 package com.groundops.tracker;
 
+import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -13,6 +16,8 @@ public class MainActivity extends BridgeActivity {
     private String nativeFcmToken = null;
     private Handler handler = new Handler(Looper.getMainLooper());
     private boolean isInjected = false;
+    private static final String OVERLAY_PREFS = "gops_overlay_hint";
+    private static final long OVERLAY_HINT_INTERVAL_MS = 24L * 3600000L; // مرة في اليوم كحد أقصى
 
     @Override 
     public void onCreate(Bundle savedInstanceState) {
@@ -45,10 +50,32 @@ public class MainActivity extends BridgeActivity {
             Intent intent = new Intent(this, LocationForegroundService.class);
             intent.setAction(LocationForegroundService.ACTION_RESUME);
             startService(intent);
+
+            // v1.1.1: لو إذن «العرض فوق التطبيقات» ناقص نعرض دليل التفعيل على طول (مرة في اليوم) — عشان الفقاعة متفضلش مخبية
+            maybeShowOverlayGuide();
             
         } catch (Exception e) { 
             Log.e("MainActivity", "Error in onResume", e);
         }
+    }
+
+    /** v1.1.1: نافذة توجيه للفقاعة العايمة — بتفعّل الإذن من غير ما الكابتن يدور في الإعدادات. */
+    private void maybeShowOverlayGuide() {
+        try {
+            if (BubbleOverlay.canShow(this)) return; // الإذن موجود — الفقاعة شغالة
+            SharedPreferences sp = getSharedPreferences(OVERLAY_PREFS, MODE_PRIVATE);
+            long last = sp.getLong("last_hint_at", 0L);
+            if (System.currentTimeMillis() - last < OVERLAY_HINT_INTERVAL_MS) return;
+            sp.edit().putLong("last_hint_at", System.currentTimeMillis()).apply();
+            new AlertDialog.Builder(this)
+                .setTitle("فعّل فقاعة التتبع 🛵")
+                .setMessage("الفقاعة العايمة بتظهر طول الشيفت فوق أي شاشة:\n• ضغطة واحدة = يفتح التطبيق\n• ضغطة مطوّلة (نص ثانية) = يبعت موقعك فوراً\n\nعشان تشتغل: من الشاشة الجاية فعّل «العرض فوق التطبيقات الأخرى» للتطبيق.")
+                .setPositiveButton("فعّل دلوقتي", (d, w) -> {
+                    try { startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()))); } catch (Throwable t) { Log.w("MainActivity", "overlay settings open failed", t); }
+                })
+                .setNegativeButton("بعدين", null)
+                .show();
+        } catch (Throwable t) { Log.w("MainActivity", "overlay guide failed", t); }
     }
 
     private void fetchFcmToken() {

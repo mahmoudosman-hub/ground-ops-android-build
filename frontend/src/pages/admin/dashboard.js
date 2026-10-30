@@ -9,14 +9,42 @@ export const AUTO_REFRESH_MS = 10 * 60 * 1000; // dashboard refreshes itself eve
 export const STATUS_OPTS = ['', 'ABSENT', 'NOT_CHECKED_IN', 'ON_TIME', 'LATE', 'CHECKED_IN', 'CHECKED_OUT', 'ON_LEAVE', 'ON_BREAK', 'INSIDE', 'OUTSIDE', 'TRACKING_UNAVAILABLE', 'POSSIBLE_SPOOFING', 'MISSING_CHECKOUT'];
 const statusLabel = (s) => (s ? s.replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) : t('All statuses'));
 
+/* d52 — قاعدة مهلة الـ 15 دقيقة: الكابتن يفضل ظاهر بآخر حالة لوكيشن معروفة (✔ جوه الفرع) طالما لم تعَدّ 15 دقيقة على آخر تحديث،
+ * وبعد 15 دقيقة كاملة من غير أي تحديث لوكيشن يظهر «مقطوع عن النظام» (Off the grid) بدل ما حالته تتقلب على طول. */
+export const GPS_GRACE_MS = 15 * 60 * 1000;
+function metersBetween(lat1, lng1, lat2, lng2) {
+  const R = 6371000, rad = Math.PI / 180, dLat = (lat2 - lat1) * rad, dLng = (lng2 - lng1) * rad;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+export function effectiveLocationState(r, now) {
+  const st = r.location_state || '';
+  if (r.on_break || r.tracking_state === 'PAUSED') return st; // بريك الصلاة أو تتبع متوقف → القاعدة القديمة (مسموح اللوكيشن يقف)
+  if (r.attendance_state && r.attendance_state !== 'CHECKED_IN') return st; // مش داخل شيفت → القاعدة القديمة
+  if (!r.last_location_at) return st; // مفيش أي لوكيشن خالص
+  const last = Date.parse(r.last_location_at);
+  if (isNaN(last)) return st;
+  const silence = (now == null ? Date.now() : now) - last;
+  if (silence >= GPS_GRACE_MS) return 'OFF_GRID'; // عدّت الـ 15 دقيقة من غير تحديث → مقطوع فعلاً
+  if (st === 'INSIDE' || st === 'OUTSIDE') return st; // لسه في المهلة → آخر حالة معروفة زي ما هي
+  if (r.last_latitude != null && r.branch_latitude != null && r.branch_radius_meters != null) {
+    try { return metersBetween(r.last_latitude, r.last_longitude, r.branch_latitude, r.branch_longitude) <= r.branch_radius_meters ? 'INSIDE' : 'OUTSIDE'; } catch (e) { /* نرجع لآخر حالة معروفة */ }
+  }
+  return st;
+}
+
 export function statusCells(r) {
   const flags = (r.flags || []).filter((f) => f === 'POSSIBLE_SPOOFING' || f === 'MISSING_CHECKOUT');
   const brk = r.on_break ? badge(r.break_exceeded ? 'BREAK_EXCEEDED' : 'ON_BREAK', `${r.break_exceeded ? 'Break over limit' : 'On break'} ${r.break_used_minutes}/${r.break_allowance_minutes} min`) : null;
   return h('span', { class: 'badges' }, badge(r.attendance_state), brk, r.sick_pending ? badge('SICK_PENDING') : null, r.punctuality === 'LATE' ? badge('LATE', `Late ${r.late_minutes} min`) : (r.punctuality === 'ON_TIME' ? badge('ON_TIME') : null), flags.map((f) => badge(f)));
 }
 export function locationCell(r) {
-  if (!r.location_state) return '-';
-  return h('span', { class: 'badges' }, badge(r.location_state), r.tracking_unavailable ? badge('TRACKING_UNAVAILABLE') : (r.tracking_state && r.tracking_state !== 'ACTIVE' ? badge(r.tracking_state) : null));
+  const st = effectiveLocationState(r);
+  if (st === 'OFF_GRID') return h('span', { class: 'badges' }, badge('OFF_GRID'), h('small', { class: 'hint' }, agoText(r.last_location_at)));
+  if (!st) return '-';
+  // d52: ضمن مهلة الـ 15 دقيقة بنثق في آخر لوكيشن معروف — تحذير «Tracking unavailable» المؤقت متخبي عشان الكابتن يفضل ظاهر ✔ جوه الفرع
+  const showUnavail = !!r.tracking_unavailable && st === 'UNKNOWN';
+  return h('span', { class: 'badges' }, badge(st), showUnavail ? badge('TRACKING_UNAVAILABLE') : (r.tracking_state && r.tracking_state !== 'ACTIVE' ? badge(r.tracking_state) : null));
 }
 export const detailLink = (r) => h('a', { class: 'btn btn-small', href: `#/employee?id=${encodeURIComponent(r.employee_id)}&date=${r.work_date || ''}` }, t('Details'));
 

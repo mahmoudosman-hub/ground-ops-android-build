@@ -5,7 +5,7 @@ import { errorMessage } from '../core/errors.js';
 /* ---------- status badges: color AND text (never color alone) ---------- */
 const BADGES = {
   ON_TIME: ['ok', 'On time'], LATE: ['bad', 'Late'], ABSENT: ['bad', 'Absent'], NOT_CHECKED_IN: ['muted', 'Not checked in'], CHECKED_IN: ['info', 'On duty'],
-  CHECKED_OUT: ['muted', 'Checked out'], ON_LEAVE: ['warn', 'On leave'], INSIDE: ['ok', 'Inside branch'], OUTSIDE: ['bad', 'Outside branch'], UNKNOWN: ['muted', 'Location unknown'],
+  CHECKED_OUT: ['muted', 'Checked out'], ON_LEAVE: ['warn', 'On leave'], INSIDE: ['ok', 'Inside branch'], OUTSIDE: ['bad', 'Outside branch'], UNKNOWN: ['muted', 'Location unknown'], OFF_GRID: ['bad', 'Off the grid'],
   ACTIVE: ['ok', 'Active'], INACTIVE: ['muted', 'Inactive'], CANCELLED: ['muted', 'Cancelled'],
   TRACKING_ACTIVE: ['info', 'Tracking active'], PAUSED: ['warn', 'Tracking paused'], PERMISSION_DENIED: ['bad', 'Location permission denied'], BACKGROUND_RESTRICTED: ['warn', 'Background restricted'],
   GPS_DISABLED: ['bad', 'GPS disabled'], UNAVAILABLE: ['muted', 'Tracking unavailable'], TRACKING_UNAVAILABLE: ['warn', 'Tracking unavailable'], STOPPED: ['muted', 'Tracking off'],

@@ -14,19 +14,22 @@
     } catch (e) { return null; }
   }
 
-  // إضافة الزرار في الشاشة
+  // d51: الزر بيتحط جوه شريط التابات (#tabs) في الآخر — بعد تاب «الطلبات» — مش عائم تحت
   function injectStatsButton() {
     if (document.getElementById('gops-stats-btn')) return;
     var sess = getSession();
     if (!sess) return; // لو مش مسجل دخول، متظهرش
-
+    var tabs = document.getElementById('tabs');
+    if (!tabs) return; // مش مسجل دخول لسه — شريط التابات مش موجود
     var btn = document.createElement('button');
     btn.id = 'gops-stats-btn';
-    btn.innerHTML = '📊';
+    btn.type = 'button';
+    btn.innerHTML = '📊 إحصائياتي';
     btn.title = 'إحصائياتي';
-    btn.style.cssText = 'position:fixed;bottom:20px;left:20px;z-index:99998;width:55px;height:55px;border-radius:50%;background:#6c5ce7;color:#fff;font-size:24px;border:none;box-shadow:0 4px 10px rgba(108,92,231,0.4);cursor:pointer;display:flex;align-items:center;justify-content:center;';
+    btn.className = 'btn btn-small';
+    btn.style.cssText = 'direction:rtl;font-weight:700;color:#fff;background:#6c5ce7;border:none;border-radius:999px;padding:4px 12px;white-space:nowrap;cursor:pointer;';
     btn.onclick = openStatsModal;
-    document.body.appendChild(btn);
+    tabs.appendChild(btn);
   }
 
   function openStatsModal() {

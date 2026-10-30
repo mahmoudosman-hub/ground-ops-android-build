@@ -12,7 +12,6 @@
 
   var API_URL = null;
 
-  // ---- Config: read API_URL from config.js (fallback if not global) ----
   function loadConfigOnce() {
     if (API_URL) return Promise.resolve(API_URL);
     try {
@@ -30,7 +29,6 @@
       .catch(function () { return null; });
   }
 
-  // ---- Session (same format as src/core/session.js) ----
   function getSession(kind) {
     var key = 'gops.session.' + kind;
     var stores = [window.localStorage, window.sessionStorage].filter(Boolean);
@@ -45,7 +43,6 @@
     return null;
   }
 
-  // ---- API call (same wire format as src/core/api.js) ----
   function apiCall(kind, action, payload, opts) {
     opts = opts || {};
     if (!API_URL) return Promise.reject(makeErr('NOT_CONFIGURED', 'API_URL is not set'));
@@ -74,10 +71,8 @@
 
   function makeErr(code, msg) { var e = new Error(msg); e.code = code; return e; }
 
-  // ---- Page detection ----
   function isAdminPage() { return /admin\.html/i.test(window.location.pathname); }
 
-  // ---- Toast ----
   function toast(msg, opts) {
     opts = opts || {};
     var el = document.createElement('div');
@@ -105,7 +100,7 @@
   // ============================================================
   // EMPLOYEE: native attestation + selfie check polling
   // ============================================================
-  function wrapFetchForAttestation() {
+    function wrapFetchForAttestation() {
     if (window.__gopsD3FetchWrapped) return;
     window.__gopsD3FetchWrapped = true;
     var origFetch = window.fetch.bind(window);
@@ -118,8 +113,16 @@
           var parsed = JSON.parse(init.body);
           if (parsed && (parsed.action === 'checkIn' || parsed.action === 'checkOut')) {
             var isNative = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+            
+            // 👇 السطرين الجديدين بتوع اكتشاف الآيفون 👇
+            var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            
             parsed.payload = parsed.payload || {};
             parsed.payload.native_attestation = isNative;
+            
+            // 👇 السطر الجديد ده بيبعت العلامة للسيرفر 👇
+            parsed.payload.is_ios = isIOS;
+            
             init = Object.assign({}, init, { body: JSON.stringify(parsed) });
           }
         }
@@ -135,6 +138,11 @@
     if (selfieState.timer) return;
     setTimeout(pollSelfie, 4000);
     selfieState.timer = setInterval(pollSelfie, SELFIE_POLL_MS);
+    // When the app comes back to the foreground (e.g. tapped from a notification), check right away
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) setTimeout(pollSelfie, 500);
+    });
+    window.addEventListener('focus', function () { setTimeout(pollSelfie, 500); });
   }
 
   function pollSelfie() {
@@ -372,7 +380,6 @@
     load();
   }
 
-  // ---- Admin: floating button (always works, independent of sidebar structure) ----
   function installAdminEntryPoint() {
     if (document.getElementById('gops-sc-fab')) return;
     var fab = document.createElement('button');
@@ -382,7 +389,6 @@
     fab.onclick = openAdminSelfiePage;
     document.body.appendChild(fab);
 
-    // Also try to add a sidebar link (best-effort, some dashboards differ)
     try {
       var nav = document.querySelector('.sidebar, nav.sidebar, aside.sidebar, .nav, aside nav, .menu, #sidebar');
       if (nav && !nav.querySelector('[data-gops-sc-link]')) {
@@ -407,7 +413,6 @@
       } else {
         installAdminEntryPoint();
       }
-      // Some admin SPAs re-render; re-inject if removed
       setInterval(function () {
         if (!document.getElementById('gops-sc-fab')) installAdminEntryPoint();
       }, 3000);

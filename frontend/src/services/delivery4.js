@@ -3,11 +3,13 @@
  * Global UI polish:
  *   - Auto-hide error messages after 5 seconds.
  *   - Show a spinner on every disabled button (feedback for slow actions).
+ *   - RTL toast fix.
  * No imports. Works on any page.
  */
 (function () {
   'use strict';
 
+  // 1. Inject CSS
   function injectCSS() {
     if (document.getElementById('gops-d4-styles')) return;
     var style = document.createElement('style');
@@ -29,18 +31,22 @@
       '  animation: gopsSpin 0.6s linear infinite;',
       '  vertical-align: middle;',
       '}',
-      '@keyframes gopsSpin { to { transform: rotate(360deg); } }'
+      '@keyframes gopsSpin { to { transform: rotate(360deg); } }',
+      'html[dir="rtl"] .toast, html[dir="rtl"] .gops-toast {',
+      '  left: auto; right: 50%; transform: translateX(50%);',
+      '}'
     ].join('\n');
     document.head.appendChild(style);
   }
 
+  // 2. Watch for disabled buttons and add a spinner
   function watchButtons() {
     function handle(btn) {
       if (btn.tagName !== 'BUTTON') return;
       if (btn.disabled) btn.classList.add('gops-loading');
       else btn.classList.remove('gops-loading');
     }
-    document.querySelectorAll('button').forEach(handle);
+    document.querySelectorAll('button[disabled]').forEach(handle);
     var obs = new MutationObserver(function (mutations) {
       mutations.forEach(function (m) {
         if (m.type === 'attributes' && m.attributeName === 'disabled') handle(m.target);
@@ -49,20 +55,31 @@
     obs.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['disabled'] });
   }
 
+  // 3. Watch for visible error boxes and auto-hide after 5s
   function watchErrors() {
     function handle(el) {
-      if (!el.classList || !el.classList.contains('form-error')) return;
-      if (el.hidden) { delete el.dataset.gopsAutoHide; return; }
+      if (el.hidden) {
+        if (el.dataset.gopsAutoHide === 'pending') {
+          delete el.dataset.gopsAutoHide;
+        }
+        return;
+      }
+      if (!el.classList.contains('form-error')) return;
+      if (el.dataset.gopsAutoHide === 'done') {
+        // Re-show: reset the animation
+        el.dataset.gopsAutoHide = '';
+        void el.offsetWidth;
+      }
       if (el.dataset.gopsAutoHide === 'pending') return;
       el.dataset.gopsAutoHide = 'pending';
       setTimeout(function () {
-        el.style.transition = 'opacity .35s';
+        el.style.transition = 'opacity .3s';
         el.style.opacity = '0';
         setTimeout(function () {
           el.hidden = true;
           el.style.opacity = '';
           el.dataset.gopsAutoHide = 'done';
-        }, 400);
+        }, 350);
       }, 5000);
     }
     document.querySelectorAll('.form-error').forEach(handle);
@@ -82,7 +99,12 @@
     obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
   }
 
-  function boot() { injectCSS(); watchButtons(); watchErrors(); }
+  // Boot
+  function boot() {
+    injectCSS();
+    watchButtons();
+    watchErrors();
+  }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
