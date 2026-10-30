@@ -93,7 +93,11 @@ function createNativeTracker({ api, provider, userId, getSettings, getShift, onC
     if (s.lastLatitude !== undefined && s.lastLatitude !== null) st.lastFix = { latitude: s.lastLatitude, longitude: s.lastLongitude, accuracy: s.lastAccuracy, timestamp: s.lastFixAt };
     if (paused && !s.ended) { st.trackingState = 'ON_BREAK'; emit(); return; } // on a break the phone may stop sampling: that is expected, not a failure
     if (s.ended) { st.ended = true; st.running = false; st.trackingState = 'STOPPED'; wantRunning = false; clearInterval(timer); timer = null; }
-    else if (s.running) { st.running = true; st.trackingState = s.state && s.state !== 'STOPPED' ? s.state : 'ACTIVE'; }
+    else if (s.running) {
+      st.running = true; st.trackingState = s.state && s.state !== 'STOPPED' ? s.state : 'ACTIVE';
+      // v1.3.0 علاج ذاتي: الخدمة شغالة لكن جواها لسه واقفة على بريك قديم والواجهة مش عارفة (reload أثناء البريك) → صلّحها فورًا بدل ما نفضل نعرض ON_BREAK والأمان ميت
+      if (!paused && s.state === 'ON_BREAK' && provider.resumeTracking) { try { await provider.resumeTracking(); st.trackingState = 'ACTIVE'; } catch (e) { /* poll الجاي يعيد المحاولة */ } }
+    }
     else if (wantRunning) { // we expect tracking, the OS stopped the service: say so, and try to bring it back (allowed while the app is in the foreground)
       st.running = false; st.trackingState = 'UNAVAILABLE'; st.error = 'SERVICE_NOT_RUNNING';
       if (now() - lastRestart > 60000 && config) { lastRestart = now(); try { config = { ...buildConfig() }; await provider.startTracking(config); } catch (e) { /* stays UNAVAILABLE */ } }
@@ -107,10 +111,17 @@ function createNativeTracker({ api, provider, userId, getSettings, getShift, onC
     if (perm !== 'granted') { st.trackingState = 'PERMISSION_DENIED'; st.error = 'PERMISSION_DENIED'; emit(); return; }
     config = buildConfig(); wantRunning = true; st.ended = false; st.error = null;
     try { await provider.startTracking(config); } catch (e) { wantRunning = false; st.trackingState = e.state || 'UNAVAILABLE'; st.error = e.code || e.state || 'START_FAILED'; emit(); return; }
-    st.running = true; st.trackingState = 'ACTIVE'; emit(); await refresh(); timer = setInterval(refresh, pollMs);
+    // v1.3.0: لو pause جه قبل ما start يخلص (reload أثناء بريك) — نفّذ الإيقاف دلوقتي على الخدمة الجديدة
+    if (paused) { try { if (provider.pauseTracking) await provider.pauseTracking(); } catch (e) { /* الخدمة نفسها هتعيد المحاولة */ } }
+    st.running = true; st.trackingState = paused ? 'ON_BREAK' : 'ACTIVE'; emit(); await refresh(); timer = setInterval(refresh, pollMs);
   }
   async function stop() { paused = false; wantRunning = false; clearInterval(timer); timer = null; try { await provider.stopTracking(); } catch (e) { /* already stopped */ } st.running = false; st.trackingState = 'STOPPED'; emit(); }
-  async function pause() { if (paused || !wantRunning) return; paused = true; st.trackingState = 'ON_BREAK'; emit(); try { if (provider.pauseTracking) await provider.pauseTracking(); } catch (e) { /* older app build: the server still ignores break points */ } }
-  async function resume() { if (!paused) return; paused = false; try { if (provider.resumeTracking) await provider.resumeTracking(); } catch (e) { /* ignore */ } await refresh(); }
+  // v1.3.0 إصلاح «البريك الغلط»: pause بيسجل نية الإيقاف دايمًا حتى لو start لسه ماشي بالخلف — start هينفذها أول ما يخلص.
+  // قبل كده: لو الصفحة عملت reload أثناء البريك، pause كان بيتخطى (wantRunning لسه false) والخدمة بتفضل شغالة/واقفة بحالة متلخبطة.
+  async function pause() { if (paused) return; paused = true; st.trackingState = 'ON_BREAK'; emit(); try { if (provider.pauseTracking) await provider.pauseTracking(); } catch (e) { /* older app build: the server still ignores break points */ } }
+  // v1.3.0: resume كان `if (!paused) return;` — النسخة الجديدة من الصفحة بعد reload كانت فاكرة إن مفيش حاجة متوقفة فمش بترجع التتبع خالص،
+  // والخدمة الأصلية فضلت متوقفة على وضع البريك لحد ما يتعمل force close (الداشبورد: مقطوع/in trouble). دلوقتي نحاول الرجوع دايمًا —
+  // النداء أصلاً idempotent على الخدمة، ولو الخدمة مش موجودة النداء بيرفض بأمان وrefresh يقرر.
+  async function resume() { paused = false; try { if (provider.resumeTracking) await provider.resumeTracking(); } catch (e) { /* service down: refresh() below restarts it if wanted */ } await refresh(); }
   return { start, stop, pause, resume, flush: refresh, state: () => ({ ...st }), onOnline: refresh, refresh };
 }

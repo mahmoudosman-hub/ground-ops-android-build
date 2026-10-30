@@ -107,8 +107,11 @@ public class LocationForegroundService extends Service {
         
         if ("GPS_ALARM_CHECK".equals(action)) {
             long __now = System.currentTimeMillis();
+            // v1.3.0: أثناء البريك مفيش إرسال لوكيشن متوقع — الإنذار ممنوع يرن (كان بيرن بعد 15 دقيقة بريك ويخوّف الكابتن)
+            TrackingCore coreSnap = core;
+            boolean pausedNow = coreSnap != null && coreSnap.isPaused();
             // v1.0.9: لو مرّت 15 دقيقة من غير لوكيشن، بنشغّل الإنذار (كانت 10 والكابتنز اشتكوا من كترتها)
-            if (__now - lastLocationTimeMs >= 15 * 60 * 1000) {
+            if (!pausedNow && __now - lastLocationTimeMs >= 15 * 60 * 1000) {
                 fireGpsAlarm();
             }
             scheduleAlarm();
@@ -393,8 +396,14 @@ public class LocationForegroundService extends Service {
     public void resumeTracking() {
         if (!running || io == null) return;
         io.execute(new Runnable() { @Override public void run() {
-            if (core == null || !core.isPaused()) return;
-            core.setPaused(false); requestUpdates(); showNotification(false); persist();
+            if (core == null) return;
+            // v1.3.0 إصلاح «البريك الغلط»: كان فيه شرط !core.isPaused() بيمنع الرجوع لو الحالة اتلخبطت
+            // (الصفحة عملت reload أثناء البريك → النسخة الجديدة مش شايفة إن الخدمة واقفة) فالخدمة فضلت متوقفة
+            // على وضع البريك لحد force close والداشبورد يورّيه مقطوع. setPaused idempotent فالنداء المتكرر آمن.
+            core.setPaused(false);
+            // v1.3.0: نصحّح وقت آخر لوكيشن عشان إنذار الـ GPS ميرنّش فور الرجوع من بريك طويل
+            lastLocationTimeMs = System.currentTimeMillis();
+            requestUpdates(); showNotification(false); persist();
             // v1.1.0: رجعنا من البريك — الفقاعة ترجع تظهر
             BubbleOverlay.show(LocationForegroundService.this, sendNowAction());
         } });
