@@ -28,6 +28,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
@@ -128,6 +129,9 @@ public class LocationForegroundService extends Service {
             // v1.3.0: أثناء البريك (وكذلك بريك الصلاة — نفس آلية الـ pause) مفيش إرسال لوكيشن متوقع — الإنذار ممنوع يرن
             TrackingCore coreSnap = core;
             boolean pausedNow = coreSnap != null && coreSnap.isPaused();
+            // v1.4.2b: لو العملية كانت اتصفرت والمنبه هو اللي رجّع الخدمة — نقرأ حالة البريك المحفوظة من آخر persist
+            // (قاعدة السكتة: بريك أو بريك صلاة = ممنوع الرن حتى لو الخدمة لسه مش جاهزة)
+            if (coreSnap == null) { try { pausedNow = prefs.status().optBoolean("paused", false); } catch (Throwable t) { } }
             // v1.4.2: خط الأساس = آخر إرسال ناجح للسيرفر (مش آخر لوكيشن محلي زي قبل).
             // بناخد أحدث قيمة من: الذاكرة (آخر flush ناجح) أو آخر قيمة متخزنة في prefs
             // (لو العملية اتصفرت بعد قتل التطبيق/إعادة تشغيل الموبايل والـ core لسه مش جاهز).
@@ -357,7 +361,10 @@ public class LocationForegroundService extends Service {
                 if (Build.VERSION.SDK_INT >= 26) alarmVibrator.vibrate(VibrationEffect.createWaveform(pattern, 0));
                 else alarmVibrator.vibrate(pattern, 0);
             }
-            handler.postDelayed(new Runnable() { @Override public void run() { stopAlarm(); } }, 5 * 60 * 1000);
+            // v1.4.2b: إيقاف الرنة تلقائيًا بعد 5 دقايق عبر main-looper handler —
+            // لو المنبه رجّع الخدمة بعد قتل العملية، handler بتاع التتبع بيبقى null
+            // (كانت NPE بتمنع جدولة الإيقاف والرنة تفضل شغالة للأبد).
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() { @Override public void run() { stopAlarm(); } }, 5 * 60 * 1000);
         } catch (Exception e) { Log.w("GPS_ALARM", "Failed to start alarm", e); }
 
         Intent open = getPackageManager().getLaunchIntentForPackage(getPackageName());
@@ -412,9 +419,10 @@ public class LocationForegroundService extends Service {
         boolean recorded = core.onFix(new TrackingCore.Fix(t, l.getLatitude(), l.getLongitude(), acc, mock, src, batteryPercent()));
         if (recorded) {
             lastLocationTimeMs = System.currentTimeMillis();
-            stopAlarm();
-            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            if (nm != null) nm.cancel(ALARM_NOTIF_ID);
+            // v1.4.2b: مبنوقفش الرنة هنا — وصول موقع محلي مش معناه إن النقاط وصلت السيرفر
+            // (مثال: GPS شغال بس النت واقف → الرنة كانت بتتقفل بعد ثواني والكابتن مش بيسمعها).
+            // الرنة والإشعار بيقفوا بس لما الإرسال للسيرفر ينجح (فحص الـ 30 ثانية في tick) —
+            // وده معنى «اللوكيشن واصل فعلًا» على الداشبورد.
             scheduleAlarm();
             if (core.syncDue(System.currentTimeMillis())) core.flush(false);
         }
@@ -436,6 +444,7 @@ public class LocationForegroundService extends Service {
             TrackingCore.Status s = core.status(serviceRunning);
             o.put("running", s.running); o.put("state", s.state); o.put("ended", s.ended); o.put("endedReason", s.endedReason == null ? JSONObject.NULL : s.endedReason);
             o.put("lastError", s.lastError == null ? JSONObject.NULL : s.lastError); o.put("pendingPoints", s.pending); o.put("employeeId", employeeId);
+            o.put("paused", core != null && core.isPaused()); // v1.4.2b: حالة البريك/بريك الصلاة تتخزن — حارس السكتة لما العملية تكون اتصفرت
             o.put("lastFixAt", s.lastFixAt == 0 ? JSONObject.NULL : s.lastFixAt); o.put("lastSyncAt", s.lastSyncAt == 0 ? JSONObject.NULL : s.lastSyncAt);
             if (s.lastLat != null) { o.put("lastLatitude", s.lastLat); o.put("lastLongitude", s.lastLon); o.put("lastAccuracy", s.lastAccuracy); }
             if (s.lastDistance != null) { o.put("lastDistance", s.lastDistance); } if (s.inside != null) { o.put("inside", s.inside); }
