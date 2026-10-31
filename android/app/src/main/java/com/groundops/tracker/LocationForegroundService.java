@@ -67,6 +67,10 @@ public class LocationForegroundService extends Service {
     // v1.4.2: وقت آخر إرسال ناجح للسيرفر — المنبه بقى يرن لو موقع الكابتن مش واصل الداشبورد من 15 دقيقة
     // أيًا كان السبب (نت واقف، GPS مقفول، التطبيق اتصفر...) — مش بس لو الجهاز مش بيقدر يلقط موقع زي قبل.
     private long lastSendOkMs = 0L;
+    // v1.4.2: حالة الرنة الحالية + وقت آخر بداية رنة — بنرن مرة واحدة كل 15 دقيقة
+    // (رنة 5 دقايق + سكتة 10) ومانرنش فوق بعض، والفحص الدقيق بيحصل كل 30 ثانية جوه الخدمة نفسها.
+    private static volatile boolean alarmRinging = false;
+    private volatile long lastAlarmFiredMs = 0L;
     
     private static MediaPlayer alarmPlayer = null;
     private static Vibrator alarmVibrator = null;
@@ -135,8 +139,10 @@ public class LocationForegroundService extends Service {
                 try { long __ls = prefs.status().optLong("lastSyncAt", 0L); if (__ls > baselineMs) baselineMs = __ls; } catch (Throwable t) { }
             }
             if (baselineMs <= 0) baselineMs = __now; // لسه مابعتش حاجة خالص → عدّ الـ 15 دقيقة من دلوقتي (begin() بتصفّره عند تشغيل الشيفت)
-            // v1.0.9 → v1.4.2: لو عدّت 15 دقيقة ومفيش لوكيشن واصل السيرفر → الإنذار يرن (نغمة رنين الموبايل + هزاز 5 دقايق)
-            if (!pausedNow && __now - baselineMs >= 15 * 60 * 1000) {
+            // v1.0.9 → v1.4.2: لو عدّت 15 دقيقة ومفيش لوكيشن واصل السيرفر → الإنذار يرن (نغمة رنين الموبايل + هزاز 5 دقايق).
+            // الحارس: مش بيرن وهو رنّان أصلاً، وبيرن مرة كل 15 دقيقة كحد أقصى (رنة 5 دقايق + سكتة 10).
+            if (!pausedNow && !alarmRinging && __now - baselineMs >= 15 * 60 * 1000
+                    && (lastAlarmFiredMs == 0 || __now - lastAlarmFiredMs >= 15 * 60 * 1000)) {
                 fireGpsAlarm();
             }
             scheduleAlarm();
@@ -248,6 +254,14 @@ public class LocationForegroundService extends Service {
                 // v1.1.0: لو الفقاعة اختفت أو الإذن اتمنح من شوية — نصلح الوضع لوحنا كل 30 ثانية
                 BubbleOverlay.ensure(LocationForegroundService.this, sendNowAction());
                 long __now = System.currentTimeMillis();
+                // v1.4.2: الفحص الرئيسي لإنذار «اللوكيشن مش واصل» — كل 30 ثانية من جوه الخدمة نفسها.
+                // ليه؟ منبه النظام (AlarmManager) بتأجله موبايلات كتير (شاومي/أوبو/سامسونج في وضع توفير البطارية)
+                // وده كان سبب وصول الرنة بعد 42 دقيقة بدل 15. الخدمة الـ foreground بتشتغل بدقة،
+                // ومنبه الـ 15 دقيقة فضل شغال احتياطيًا لو العملية نفسها اتصفرت أو الموبايل اتعمله restart.
+                if (!core.isPaused() && !alarmRinging && __now - lastSendOkMs >= 15 * 60 * 1000
+                        && (lastAlarmFiredMs == 0 || __now - lastAlarmFiredMs >= 15 * 60 * 1000)) {
+                    fireGpsAlarm();
+                }
                 if (__now - lastSelfiePollMs >= 60000L) {
                     lastSelfiePollMs = __now;
                     SelfieCheckNotifier.pollAndNotify(LocationForegroundService.this, cfgApiUrl, cfgToken, employeeId);
@@ -269,7 +283,14 @@ public class LocationForegroundService extends Service {
         intent.setAction("GPS_ALARM_CHECK");
         PendingIntent pi = PendingIntent.getService(ctx, ALARM_REQUEST_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         long triggerTime = System.currentTimeMillis() + 15 * 60 * 1000; // كل 15 دقيقة
-        if (Build.VERSION.SDK_INT >= 23) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pi);
+        // v1.4.2: على أندرويد 12+ (خصوصًا 14) إذن المنبه الدقيق ممكن يكون مش متمنح —
+        // من غير الفحص ده setExactAndAllowWhileIdle بيرمي SecurityException وسلسلة المنبه تموت خالص
+        // (الرنة مستحيل ترن). الفحص الدقيق جوه الخدمة بيغطي الفرق، وده احتياطي تقريبي ±10 دقايق.
+        if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) {
+            am.setWindow(AlarmManager.RTC_WAKEUP, triggerTime, 10 * 60 * 1000, pi);
+        } else if (Build.VERSION.SDK_INT >= 23) {
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pi);
+        }
         else am.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pi);
     }
 
@@ -292,7 +313,7 @@ public class LocationForegroundService extends Service {
         } catch (Throwable t) { Log.w("GPS_ALARM", "resumeFromBoot failed: " + t); }
     }
 
-    private void fireGpsAlarm() {
+    private synchronized void fireGpsAlarm() {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
@@ -319,6 +340,9 @@ public class LocationForegroundService extends Service {
         } catch (Exception e) {}
 
         stopAlarm();
+        // v1.4.2: سجّل إن الرنة بدأت دلوقتي — الحارس بيمنع تكرارها قبل ما تخلص دورة الـ 15 دقيقة
+        lastAlarmFiredMs = System.currentTimeMillis();
+        alarmRinging = true;
         try {
             alarmPlayer = new MediaPlayer();
             alarmPlayer.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM).setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
@@ -351,7 +375,8 @@ public class LocationForegroundService extends Service {
         try { nm.notify(ALARM_NOTIF_ID, n); } catch (RuntimeException e) { }
     }
 
-    private void stopAlarm() {
+    private synchronized void stopAlarm() {
+        alarmRinging = false; // v1.4.2: الرنة وقفت
         if (alarmPlayer != null) { try { alarmPlayer.stop(); alarmPlayer.release(); } catch (Exception e) {} alarmPlayer = null; }
         if (alarmVibrator != null) { try { alarmVibrator.cancel(); } catch (Exception e) {} alarmVibrator = null; }
     }
