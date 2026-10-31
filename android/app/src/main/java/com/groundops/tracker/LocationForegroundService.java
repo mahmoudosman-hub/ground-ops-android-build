@@ -64,6 +64,9 @@ public class LocationForegroundService extends Service {
     private String cfgApiUrl = "", cfgToken = "";
     private long lastSelfiePollMs = 0L;
     private long lastLocationTimeMs = 0L;
+    // v1.4.2: وقت آخر إرسال ناجح للسيرفر — المنبه بقى يرن لو موقع الكابتن مش واصل الداشبورد من 15 دقيقة
+    // أيًا كان السبب (نت واقف، GPS مقفول، التطبيق اتصفر...) — مش بس لو الجهاز مش بيقدر يلقط موقع زي قبل.
+    private long lastSendOkMs = 0L;
     
     private static MediaPlayer alarmPlayer = null;
     private static Vibrator alarmVibrator = null;
@@ -118,11 +121,22 @@ public class LocationForegroundService extends Service {
                 stopSelf();
                 return START_NOT_STICKY;
             }
-            // v1.3.0: أثناء البريك مفيش إرسال لوكيشن متوقع — الإنذار ممنوع يرن (كان بيرن بعد 15 دقيقة بريك ويخوّف الكابتن)
+            // v1.3.0: أثناء البريك (وكذلك بريك الصلاة — نفس آلية الـ pause) مفيش إرسال لوكيشن متوقع — الإنذار ممنوع يرن
             TrackingCore coreSnap = core;
             boolean pausedNow = coreSnap != null && coreSnap.isPaused();
-            // v1.0.9: لو مرّت 15 دقيقة من غير لوكيشن، بنشغّل الإنذار (كانت 10 والكابتنز اشتكوا من كترتها)
-            if (!pausedNow && __now - lastLocationTimeMs >= 15 * 60 * 1000) {
+            // v1.4.2: خط الأساس = آخر إرسال ناجح للسيرفر (مش آخر لوكيشن محلي زي قبل).
+            // بناخد أحدث قيمة من: الذاكرة (آخر flush ناجح) أو آخر قيمة متخزنة في prefs
+            // (لو العملية اتصفرت بعد قتل التطبيق/إعادة تشغيل الموبايل والـ core لسه مش جاهز).
+            long baselineMs = lastSendOkMs;
+            if (coreSnap != null) {
+                long __ls = coreSnap.lastSuccessfulSyncAt();
+                if (__ls > baselineMs) baselineMs = __ls;
+            } else {
+                try { long __ls = prefs.status().optLong("lastSyncAt", 0L); if (__ls > baselineMs) baselineMs = __ls; } catch (Throwable t) { }
+            }
+            if (baselineMs <= 0) baselineMs = __now; // لسه مابعتش حاجة خالص → عدّ الـ 15 دقيقة من دلوقتي (begin() بتصفّره عند تشغيل الشيفت)
+            // v1.0.9 → v1.4.2: لو عدّت 15 دقيقة ومفيش لوكيشن واصل السيرفر → الإنذار يرن (نغمة رنين الموبايل + هزاز 5 دقايق)
+            if (!pausedNow && __now - baselineMs >= 15 * 60 * 1000) {
                 fireGpsAlarm();
             }
             scheduleAlarm();
@@ -182,6 +196,7 @@ public class LocationForegroundService extends Service {
         lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE); cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         
         lastLocationTimeMs = System.currentTimeMillis();
+        lastSendOkMs = System.currentTimeMillis(); // v1.4.2: بداية عدّ «آخر إرسال ناجح» من لحظة تشغيل الشيفت
 
         if (!running) {
             instance = this; running = true;
@@ -222,6 +237,14 @@ public class LocationForegroundService extends Service {
                 if (core.shouldStop()) { shutdown(null, true); return; }
                 checkProviders();
                 if (core.syncDue(System.currentTimeMillis())) core.flush(false);
+                // v1.4.2: لو النقاط وصلت السيرفر فعلًا (آخر مزامنة ناجحة اتقدمت) — نصفّر خط الأساس ونوقف أي رنة شغالة
+                long __ls = core.lastSuccessfulSyncAt();
+                if (__ls > lastSendOkMs) {
+                    lastSendOkMs = __ls;
+                    stopAlarm();
+                    NotificationManager __nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                    if (__nm != null) __nm.cancel(ALARM_NOTIF_ID);
+                }
                 // v1.1.0: لو الفقاعة اختفت أو الإذن اتمنح من شوية — نصلح الوضع لوحنا كل 30 ثانية
                 BubbleOverlay.ensure(LocationForegroundService.this, sendNowAction());
                 long __now = System.currentTimeMillis();
@@ -236,15 +259,37 @@ public class LocationForegroundService extends Service {
         }
     };
 
-    private void scheduleAlarm() {
-        AlarmManager am = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+    private void scheduleAlarm() { scheduleAlarmAt(this); }
+
+    /** v1.4.2: نسخة static عشان BootReceiver يقدر يعيد بناء سلسلة المنبه بعد إعادة تشغيل الموبايل. */
+    static void scheduleAlarmAt(Context ctx) {
+        AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
         if (am == null) return;
-        Intent intent = new Intent(this, LocationForegroundService.class);
+        Intent intent = new Intent(ctx, LocationForegroundService.class);
         intent.setAction("GPS_ALARM_CHECK");
-        PendingIntent pi = PendingIntent.getService(this, ALARM_REQUEST_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        long triggerTime = System.currentTimeMillis() + 15 * 60 * 1000; // v1.0.9: كل 15 دقيقة (كانت 10)
+        PendingIntent pi = PendingIntent.getService(ctx, ALARM_REQUEST_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        long triggerTime = System.currentTimeMillis() + 15 * 60 * 1000; // كل 15 دقيقة
         if (Build.VERSION.SDK_INT >= 23) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pi);
         else am.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pi);
+    }
+
+    /**
+     * v1.4.2: بعد إعادة تشغيل الموبايل أو تحديث التطبيق — لو فيه شيفت لسه شغال (config محفوظ):
+     * 1) نحاول نرجّع التتبع نفسه (محتاج إذن «السماح طوال الوقت» — لو مش متمنح بيفشل بهدوء من غير كراش).
+     * 2) نضمن سلسلة منبه الـ GPS: المنبه هيشتغل كل 15 دقيقة ولو لقى اللوكيشن مش واصل السيرفر → يرن.
+     */
+    static void resumeFromBoot(Context ctx) {
+        try {
+            TrackingPrefs p = new TrackingPrefs(ctx);
+            String cfg = p.config();
+            if (cfg == null || cfg.trim().isEmpty()) return; // مفيش شيفت نشط = مفيش حاجة ترجع (حارس v1.4.0)
+            try {
+                Intent svc = new Intent(ctx, LocationForegroundService.class);
+                svc.putExtra(EXTRA_CONFIG, cfg);
+                if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(svc); else ctx.startService(svc);
+            } catch (Throwable t) { Log.w("GPS_ALARM", "boot resume FGS failed: " + t); }
+            scheduleAlarmAt(ctx);
+        } catch (Throwable t) { Log.w("GPS_ALARM", "resumeFromBoot failed: " + t); }
     }
 
     private void fireGpsAlarm() {
@@ -434,6 +479,7 @@ public class LocationForegroundService extends Service {
             core.setPaused(false);
             // v1.3.0: نصحّح وقت آخر لوكيشن عشان إنذار الـ GPS ميرنّش فور الرجوع من بريك طويل
             lastLocationTimeMs = System.currentTimeMillis();
+            lastSendOkMs = System.currentTimeMillis(); // v1.4.2: رجعنا من بريك/صلاة → عدّ الـ 15 دقيقة من جديد
             requestUpdates(); showNotification(false); persist();
             // v1.1.0: رجعنا من البريك — الفقاعة ترجع تظهر
             BubbleOverlay.show(LocationForegroundService.this, sendNowAction());

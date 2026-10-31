@@ -16,6 +16,8 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- v1.4.2: الاستيقاظ بعد إعادة تشغيل الموبايل — لو فيه شيفت شغال نكمّل تتبع ومنبه الـ GPS -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- v1.1.0: فقاعة عائمة زي الماسنجر فوق باقي التطبيقات أثناء الشيفت -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -62,6 +64,17 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- v1.4.2: بعد إعادة تشغيل الموبايل أو تحديث التطبيق → نرجّع التتبع وسلسلة منبه الـ GPS لو فيه شيفت شغال -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

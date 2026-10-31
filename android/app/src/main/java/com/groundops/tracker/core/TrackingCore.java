@@ -95,6 +95,9 @@ public final class TrackingCore {
 
     public synchronized void setPaused(boolean p) { if (paused && !p) { lastRecordedTs = -1; providerState = null; } paused = p; }
     public synchronized boolean isPaused() { return paused; }
+    /** v1.4.2: وقت آخر إرسال ناجح لنقاط للسيرفر (0 = لسه مابعتش حاجة) — منبه «اللوكيشن مش واصل» بيتبنى عليه.
+     *  بيتحدّث فقط لما السيرفر يرجّع success ونقاط فعلية اتمسحت من الطابور (flush سطر store.delete). */
+    public synchronized long lastSuccessfulSyncAt() { return lastSyncAt; }
     public synchronized void setProviderState(String state) {
         providerState = state;
         if (state != null && !state.equals(reportedState)) { reportedState = state; reportStateToServer(state); }
