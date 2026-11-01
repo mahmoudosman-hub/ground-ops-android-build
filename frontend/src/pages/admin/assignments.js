@@ -43,15 +43,16 @@ export async function assignmentsPage(ctx) {
         if (v.employee_id_a === v.employee_id_b) throw Object.assign(new Error(t('Pick two different captains.')), { code: 'VALIDATION_ERROR' });
         const msg = t('Swap the shifts of {a} and {b} on {d}? Each one gets a notification with the new branch.', { a: en[v.employee_id_a] || v.employee_id_a, b: en[v.employee_id_b] || v.employee_id_b, d: v.work_date });
         if (!(await confirmDialog(msg))) return;
+        const busy = toast(t('Swapping... please wait'), 'info', 30000); // تغذية فورية: كان بيصمت لحد ما السيرفر يرد
         let res;
         try { res = await ctx.api.call('swapAssignments', { employee_id_a: v.employee_id_a, employee_id_b: v.employee_id_b, work_date: v.work_date }); }
         catch (e) {
-          m.close();
+          busy.remove(); m.close();
           if (e.code === 'SWAP_NO_ASSIGNMENT') toast(t('No active assignment on that date for {n}.', { n: (e.details && e.details.employee_id) || '' }), 'bad', 8000);
           else toastError(e);
           return;
         }
-        m.close();
+        busy.remove(); m.close();
         toast(t('Swapped ✅ {a} → {ab} and {b} → {bb}. Push delivered to {n} device(s).', { a: res.a.employee_name, ab: res.a.branch_name, b: res.b.employee_name, bb: res.b.branch_name, n: res.notified }), 'ok', 9000);
         if (res.no_token && res.no_token.length) toast(t('No registered device for: {n}', { n: res.no_token.join(', ') }), 'warn', 8000);
         lp.reload();

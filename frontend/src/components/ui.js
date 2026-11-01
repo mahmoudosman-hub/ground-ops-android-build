@@ -46,6 +46,8 @@ export function confirmDialog(message, { okLabel = t('Confirm'), danger = false 
     let done = false; const fin = (v) => { if (!done) { done = true; m.close(); resolve(v); } };
     const m = openModal({ title: t('Please confirm'), body: h('p', {}, message), onClose: () => fin(false),
       actions: [button(t('Cancel'), { on: { click: () => fin(false) } }), button(okLabel, { kind: danger ? 'danger' : 'primary', on: { click: () => fin(true) } })] });
+    const ok = m.el.querySelector('.modal-actions .btn-primary, .modal-actions .btn-danger');
+    if (ok) ok.focus(); // Enter = Confirm — قبل كده الفوكس كان على Cancel فأي Enter كان بيلغي النافذة فوراً
   });
 }
 
