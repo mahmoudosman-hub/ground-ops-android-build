@@ -16,31 +16,36 @@ import java.util.Map;
 public class GopsFirebaseMessagingService extends FirebaseMessagingService {
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
-        // 1. بنجيب البيانات من الـ Data
-        Map<String, String> data = remoteMessage.getData();
-        String title = data.get("title");
-        String body = data.get("body");
-        
-        if (title == null) title = "Ground OPS";
-        if (body == null) body = "New notification";
-
-        // 2. بنتأكد إن الكابتن لسه في الشيفت (عشان منبعتش إشعار بعد الـ Checkout)
-        TrackingPrefs prefs = new TrackingPrefs(this);
-        String config = prefs.config();
-        
-        if (config == null || config.isEmpty()) {
-            Log.d("FCM", "Notification blocked: Captain checked out.");
-            return; // لو مفيش شيفت شغال، بنرفض الإشعار
-        }
-
-        // 3. بنشغل الإنذار ونعرض الإشعار
+        // v1.4.4: أي خطأ هنا ممنوع بكل الطرق يقفل التطبيق — الإشعار ده غيره بيتجاهل
         try {
-            GopsAlarm.start(this);
-        } catch (Exception e) {
-            Log.e("FCM", "Failed to start alarm", e);
-        }
+            // 1. بنجيب البيانات من الـ Data
+            Map<String, String> data = remoteMessage.getData();
+            String title = data.get("title");
+            String body = data.get("body");
 
-        showNotification(this, title, body);
+            if (title == null) title = "Ground OPS";
+            if (body == null) body = "New notification";
+
+            // 2. بنتأكد إن الكابتن لسه في الشيفت (عشان منبعتش إشعار بعد الـ Checkout)
+            TrackingPrefs prefs = new TrackingPrefs(this);
+            String config = prefs.config();
+
+            if (config == null || config.isEmpty()) {
+                Log.d("FCM", "Notification blocked: Captain checked out.");
+                return; // لو مفيش شيفت شغال، بنرفض الإشعار
+            }
+
+            // 3. بنشغل الإنذار ونعرض الإشعار
+            try {
+                GopsAlarm.start(this);
+            } catch (Exception e) {
+                Log.e("FCM", "Failed to start alarm", e);
+            }
+
+            showNotification(this, title, body);
+        } catch (Throwable t) {
+            Log.e("FCM", "onMessageReceived failed (ignored)", t);
+        }
     }
 
     private void showNotification(Context ctx, String title, String body) {
@@ -53,10 +58,14 @@ public class GopsFirebaseMessagingService extends FirebaseMessagingService {
             nm.createNotificationChannel(ch);
         }
 
+        // v1.4.4: لو مفيش launch intent (نادراً) — بنعرض الإشعار من غير ضغطة فتح بدل كراش NPE
         Intent open = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName());
-        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
-        PendingIntent pi = PendingIntent.getActivity(ctx, 0, open, flags);
+        PendingIntent pi = null;
+        if (open != null) {
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
+            pi = PendingIntent.getActivity(ctx, 0, open, flags);
+        }
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(ctx, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_tracking)
@@ -64,9 +73,11 @@ public class GopsFirebaseMessagingService extends FirebaseMessagingService {
             .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_CALL)
-            .setFullScreenIntent(pi, true)
-            .setAutoCancel(true)
-            .setContentIntent(pi);
+            .setAutoCancel(true);
+        if (pi != null) {
+            builder.setFullScreenIntent(pi, true);
+            builder.setContentIntent(pi);
+        }
 
         nm.notify(9998, builder.build());
     }

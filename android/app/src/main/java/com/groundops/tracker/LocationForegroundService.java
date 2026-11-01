@@ -93,6 +93,15 @@ public class LocationForegroundService extends Service {
         io = Executors.newSingleThreadExecutor();
     }
 
+    /** v1.4.4: تنفيذ آمن على الـ executor — أي استثناء أو رفض تنفيذ بعد الإغلاق
+     *  (RejectedExecutionException) ممنوع يوصل للثريات بتاعة النظام ويقفل التطبيق. */
+    private void safeIO(final Runnable r) {
+        final Runnable guarded = new Runnable() { @Override public void run() {
+            try { r.run(); } catch (Throwable t) { Log.w("GOPS-SVC", "task failed (recovered)", t); }
+        } };
+        try { io.execute(guarded); } catch (Throwable t) { Log.w("GOPS-SVC", "io rejected (recovered)", t); }
+    }
+
     @Override public IBinder onBind(Intent intent) { return null; }
 
     @Override 
@@ -114,6 +123,7 @@ public class LocationForegroundService extends Service {
         }
         
         if ("GPS_ALARM_CHECK".equals(action)) {
+          try {
             long __now = System.currentTimeMillis();
             // v1.4.0 حارس «مفيش شيفت»: أول ما الكابتن يعمل Check-Out (أو الشيفت يخلص/فشل التشغيل) الـ config بيتمسح من الجهاز.
             // العيب القديم: المنبه كان بيفضل مسجل في AlarmManager بتاع نظام الأندرويد بعد الـ Check-Out،
@@ -151,6 +161,14 @@ public class LocationForegroundService extends Service {
             }
             scheduleAlarm();
             return START_STICKY;
+          } catch (Throwable t) {
+            // v1.4.4: أي خطأ في فحص المنبه ممنوع يقطع سلسلة الـ 15 دقيقة
+            Log.w("GPS_ALARM", "alarm check failed (recovered)", t);
+            try {
+                if (prefs != null) { String __c = prefs.config(); if (__c != null && !__c.trim().isEmpty()) scheduleAlarm(); }
+            } catch (Throwable x) { }
+            return START_STICKY;
+          }
         }
         
         final String cfgJson = intent.getStringExtra(EXTRA_CONFIG);
@@ -163,7 +181,7 @@ public class LocationForegroundService extends Service {
         if (running) return START_STICKY;
 
         if (io == null) io = Executors.newSingleThreadExecutor();
-        io.execute(new Runnable() {
+        safeIO(new Runnable() {
             @Override public void run() {
                 try { begin(cfgJson); } 
                 catch (RuntimeException e) { 
@@ -211,19 +229,19 @@ public class LocationForegroundService extends Service {
         if (!running) {
             instance = this; running = true;
             listener = new LocationListener() {
-                @Override public void onLocationChanged(final Location l) { io.execute(new Runnable() { @Override public void run() { handleFix(l); } }); }
-                @Override public void onProviderDisabled(String p) { io.execute(new Runnable() { @Override public void run() { checkProviders(); } }); }
-                @Override public void onProviderEnabled(String p) { io.execute(new Runnable() { @Override public void run() { checkProviders(); } }); }
+                @Override public void onLocationChanged(final Location l) { safeIO(new Runnable() { @Override public void run() { handleFix(l); } }); }
+                @Override public void onProviderDisabled(String p) { safeIO(new Runnable() { @Override public void run() { checkProviders(); } }); }
+                @Override public void onProviderEnabled(String p) { safeIO(new Runnable() { @Override public void run() { checkProviders(); } }); }
                 @Override public void onStatusChanged(String p, int s, Bundle e) { }
             };
             requestUpdates();
             if (cm != null) {
-                netCb = new ConnectivityManager.NetworkCallback() { @Override public void onAvailable(Network n) { io.execute(new Runnable() { @Override public void run() { if (core != null) { core.flush(true); persist(); } } }); } };
+                netCb = new ConnectivityManager.NetworkCallback() { @Override public void onAvailable(Network n) { safeIO(new Runnable() { @Override public void run() { if (core != null) { core.flush(true); persist(); } } }); } };
                 try { cm.registerNetworkCallback(new NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), netCb); } catch (RuntimeException e) { netCb = null; }
             }
             handler.postDelayed(tick, TICK_MS);
             scheduleAlarm();
-            io.execute(new Runnable() { @Override public void run() { checkProviders(); core.flush(true); persist(); } });
+            safeIO(new Runnable() { @Override public void run() { checkProviders(); core.flush(true); persist(); } });
             persist();
             // v1.1.0: ظهّر فقاعة الماسنجر طول ما الشيفت شغال (ضغطة = يفتح التطبيق / ضغطة مطوّلة = يبعت اللوكيشن)
             BubbleOverlay.show(this, sendNowAction());
@@ -233,7 +251,7 @@ public class LocationForegroundService extends Service {
     /** v1.1.0: ضغطة مطوّلة على الفقاعة = تبعت النقاط المخزنة (آخر لوكيشن) للسيرفر فوراً. */
     private BubbleOverlay.SendNow sendNowAction() {
         return new BubbleOverlay.SendNow() { @Override public void run() {
-            io.execute(new Runnable() { @Override public void run() {
+            safeIO(new Runnable() { @Override public void run() {
                 try { if (core != null) { core.flush(true); persist(); } } catch (Throwable t) { }
             } });
         } };
@@ -242,7 +260,7 @@ public class LocationForegroundService extends Service {
     private final Runnable tick = new Runnable() {
         @Override public void run() {
             if (!running) return;
-            io.execute(new Runnable() { @Override public void run() {
+            safeIO(new Runnable() { @Override public void run() {
                 if (core == null) return;
                 if (core.shouldStop()) { shutdown(null, true); return; }
                 checkProviders();
@@ -494,7 +512,7 @@ public class LocationForegroundService extends Service {
 
     public void pauseTracking() {
         if (!running || io == null) return;
-        io.execute(new Runnable() { @Override public void run() {
+        safeIO(new Runnable() { @Override public void run() {
             if (core == null || core.isPaused()) return;
             try { if (lm != null && listener != null) lm.removeUpdates(listener); } catch (RuntimeException e) { }
             core.setPaused(true); showNotification(true); persist();
@@ -505,7 +523,7 @@ public class LocationForegroundService extends Service {
 
     public void resumeTracking() {
         if (!running || io == null) return;
-        io.execute(new Runnable() { @Override public void run() {
+        safeIO(new Runnable() { @Override public void run() {
             if (core == null) return;
             // v1.3.0 إصلاح «البريك الغلط»: كان فيه شرط !core.isPaused() بيمنع الرجوع لو الحالة اتلخبطت
             // (الصفحة عملت reload أثناء البريك → النسخة الجديدة مش شايفة إن الخدمة واقفة) فالخدمة فضلت متوقفة
