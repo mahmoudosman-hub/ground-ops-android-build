@@ -1,21 +1,70 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Ground OPS Tracker - ProGuard Rules
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# ============= General Rules =============
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Keep annotations
+-keepattributes *Annotation*,EnclosingMethod,Signature,InnerClasses,LineNumberTable,SourceFile
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Rename source file for error reporting
+-renamesourcefileattribute SourceFile
+
+# Keep line numbers for crash reporting
+-keepattributes SourceFile,LineNumberTable
+
+# ============= Application-Specific Rules =============
+
+# Keep all Ground OPS classes
+-keep class com.groundops.tracker.** { *; }
+-keep interface com.groundops.tracker.** { *; }
+-keepnames class com.groundops.tracker.**
+
+# Keep activity names (required by Android)
+-keepnames class * extends android.app.Activity
+-keepnames class * extends android.app.Service
+-keepnames class * extends android.content.BroadcastReceiver
+-keepnames class * extends android.content.ContentProvider
+
+# Keep view constructors (needed for XML inflation)
+-keepclasseswithmembers class * {
+    public <init>(android.content.Context, android.util.AttributeSet);
+}
+
+# ============= Firebase Rules =============
+
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.**
+-dontwarn java.lang.invoke.**
+
+# ============= Capacitor Rules =============
+
+-keep class com.getcapacitor.** { *; }
+-keep interface com.getcapacitor.** { *; }
+-dontwarn com.getcapacitor.**
+
+# ============= Cordova Rules =============
+
+-keep class org.apache.cordova.** { *; }
+-keep interface org.apache.cordova.** { *; }
+-dontwarn org.apache.cordova.**
+
+# ============= Timber Logging =============
+
+-keep class timber.log.Timber* { *; }
+-keep class timber.log.Timber$DebugTree { *; }
+
+# ============= BuildConfig =============
+
+-keep class com.groundops.tracker.BuildConfig { *; }
+
+# ============= Optimization Settings =============
+
+# Verbose output
+-verbose
+
+# Optimization passes
+-optimizationpasses 5
+-dontusemixedcaseclassnames
+
+# Class merging (can cause issues with reflection)
+-allowaccessmodification

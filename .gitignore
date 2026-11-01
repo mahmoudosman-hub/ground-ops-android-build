@@ -1,0 +1,106 @@
+# Android build files
+android/.gradle
+android/build/
+android/app/build/
+android/app/debug/
+android/app/release/
+
+# Android IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+*.swp
+*.swo
+*~
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+.gradletasknamecache
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Gradle wrapper
+gradle/wrapper/gradle-wrapper.properties
+
+# Output of the go-offline dependency resolution
+/.gradle/dependency-state
+
+# Production signing
+keystore.properties
+*.jks
+*.keystore
+*.key
+release.keystore
+
+# Google Firebase
+google-services.json
+serviceAccountKey.json
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build outputs
+*.apk
+*.aab
+*.dex
+*.class
+
+# Java/Android specific
+bin/
+gen/
+*.class
+*.dex
+.classpath
+
+# Emulator
+.emulator_console_auth_token
+
+# Android Studio
+captures/
+.externalNativeBuild/
+.cxx/
+
+# CMake
+cmake-build-*/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Misc
+.env
+.env.local
+.env.*.local
+*.sublime-workspace
+*.sublime-project
+
+# Cordova
+cordova/
+
+# Node modules (if using node-based build)
+node_modules/
+
+# Yarn
+yarn-error.log
