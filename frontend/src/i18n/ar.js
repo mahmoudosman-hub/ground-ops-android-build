@@ -77,7 +77,16 @@ const AR = {
   'Location permission denied': 'إذن الموقع مرفوض', 'GPS disabled': 'الـ GPS مقفول', 'Background restricted': 'الشغل في الخلفية مقفول',
   'Low accuracy': 'دقة الموقع ضعيفة', 'Possible spoofing': 'شبهة موقع مزيّف', 'Missing check-out': 'لم يسجل الانصراف',
   'Left branch': 'ساب الفرع', 'Returned': 'رجع الفرع', 'Not checked in': 'لم يسجل الحضور',
-  'Checked out': 'سجل الانصراف', 'On leave': 'في إجازة', 'Late': 'متأخر', 'On time': 'في المعاد', 'Absent': 'غايب'
+  'Checked out': 'سجل الانصراف', 'On leave': 'في إجازة', 'Late': 'متأخر', 'On time': 'في المعاد', 'Absent': 'غايب',
+
+  // ---------- S16: تبديل بين كابتنين ----------
+  'Swap captains': 'تبديل بين كابتنين', 'Swap': 'بدّل',
+  'Captain 1': 'الكابتن الأول', 'Captain 2': 'الكابتن التاني',
+  'Pick two different captains.': 'اختار كابتنين مختلفين.',
+  'Swap the shifts of {a} and {b} on {d}? Each one gets a notification with the new branch.': 'هتبدل شيفت {a} و {b} يوم {d}؟ كل واحد فيهم هيوصله إشعار بالفرع الجديد.',
+  'Swapped ✅ {a} → {ab} and {b} → {bb}. Push delivered to {n} device(s).': 'اتبدل ✅ {a} ← فرع {ab} ، و {b} ← فرع {bb}. الإشعار وصل لـ {n} جهاز.',
+  'No active assignment on that date for {n}.': '{n} مالوش شيفت مسجلة في اليوم ده.',
+  'No registered device for: {n}': 'مفيش جهاز مسجل بإشعارات لـ: {n}'
 };
 
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً
