@@ -128,7 +128,15 @@ const AR = {
   'Install this app on your phone for quick access.': 'ثبّت التطبيق على موبايلك للوصول السريع.',
   'Sections': 'الأقسام',
   'To install on iPhone: tap the Share button in Safari, then "Add to Home Screen".': 'للتثبيت على الآيفون: دوس زرار المشاركة في Safari وبعدين اختار "Add to Home Screen".',
-  'Your Employee ID and password are provided by your administrator.': 'رقم الموظف وكلمة المرور بيوفّرهم لك المدير المسؤول.'
+  'Your Employee ID and password are provided by your administrator.': 'رقم الموظف وكلمة المرور بيوفّرهم لك المدير المسؤول.',
+
+  // ---------- d72: كارت «مؤشرات أدائي» في هوم الكابتن (getMyKpi) ----------
+  'My KPI': 'مؤشرات أدائي',
+  'Excellent': 'ممتاز',
+  'Good': 'جيد',
+  'Needs improvement': 'محتاج تحسين',
+  '{n} days this month': '{n} يوم في الشهر ده',
+  'No KPI data yet this month.': 'مفيش بيانات KPI للشهر ده لسه.'
 };
 
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً

@@ -11,6 +11,7 @@ import { createHome } from './home.js';
 import { createNotificationBell } from '../../components/notifications.js';
 import { createScheduleView, createRequestsView } from './requests.js';
 import { initTheme } from '../../services/theme.js'; // d70: زرار الوضع الليلي 🌙/☀️
+import { createLangToggle } from '../../services/lang-toggle.js'; // d72: زرار تبديل اللغة عربي/English
 
 // =====================================================================
 // d55 — iOS Google Maps Live Share card
@@ -89,6 +90,7 @@ export function mountEmployeeApp(root, deps = {}) {
   globalThis.addEventListener('online', updateNet); globalThis.addEventListener('offline', updateNet); updateNet();
   const body = h('main', { id: 'main', class: 'container narrow' }), headerRight = h('div', { class: 'header-right' });
   const themeBtn = initTheme(); // d70: بيتحط جوه headerRight مع كل إعادة بناء عشان ميتشالش
+  const langBtn = createLangToggle(); // d72: نفس فكرة themeBtn — عنصر واحد بيتعاد تركيبه مع كل إعادة بناء للهيدر
   const installBox = h('div', { id: 'install-box' });
   mount(root, h('header', { class: 'app-header' }, h('div', { class: 'brand' }, h('img', { src: './assets/icons/icon-192.png', alt: '', width: 28, height: 28 }), h('span', {}, cfg().APP_NAME)), netBadge, headerRight),
     h('div', { id: 'update-bar' }), body, installBox);
@@ -121,9 +123,9 @@ export function mountEmployeeApp(root, deps = {}) {
   function view() {
     if (home) { home.destroy(); home = null; }
     if (bell) { bell.destroy(); bell = null; }
-    const s = api.session(); mount(headerRight, themeBtn);
+    const s = api.session(); mount(headerRight, langBtn, themeBtn);
     if (!s) return loginView();
-    if (!s.user.must_change_password) { bell = createNotificationBell({ api }); mount(headerRight, bell.el, themeBtn, h('span', { class: 'who' }, s.user.name), logoutBtn()); } else mount(headerRight, themeBtn, h('span', { class: 'who' }, s.user.name), logoutBtn());
+    if (!s.user.must_change_password) { bell = createNotificationBell({ api }); mount(headerRight, bell.el, langBtn, themeBtn, h('span', { class: 'who' }, s.user.name), logoutBtn()); } else mount(headerRight, langBtn, themeBtn, h('span', { class: 'who' }, s.user.name), logoutBtn());
     if (s.user.must_change_password) return changePasswordView();
     home = createHome({ api, provider, queue }); sched = createScheduleView({ api }); reqs = createRequestsView({ api, onChange: () => { if (home) home.refresh(); } });
     const boxes = { home: h('div', { id: 'view-home' }, home.el), schedule: h('div', { id: 'view-schedule', hidden: true }, sched.el), requests: h('div', { id: 'view-requests', hidden: true }, reqs.el) };

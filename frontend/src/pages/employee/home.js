@@ -1,8 +1,8 @@
 import { h, mount } from '../../core/dom.js';
 import { t } from '../../core/i18n.js';
-import { fmtTime, fmtDate, fmtDateTime, agoText, addDays, todayLocal } from '../../core/time.js';
+import { fmtTime, fmtDate, fmtDateTime, agoText } from '../../core/time.js';
 import { haversineMeters } from '../../core/geo.js';
-import { badge, button, spinner, errorBox, toast, toastError, dataTable } from '../../components/ui.js';
+import { badge, button, spinner, errorBox, toast, toastError } from '../../components/ui.js';
 import { createTracker } from '../../services/tracker.js';
 import { cfg } from '../../core/config.js';
 import { openCheckIn, openCheckOut } from './checkin.js';
@@ -14,25 +14,26 @@ const isOnline = () => !(globalThis.navigator && globalThis.navigator.onLine ===
 
 export function createHome({ api, provider, queue }) {
   const user = api.session().user, userId = user.employee_id;
-  let schedule = null, fromCache = false, loadError = null, trk = { trackingState: 'STOPPED', pending: 0 }, gps = null, history = null, destroyed = false, awake = false;
+  let schedule = null, fromCache = false, loadError = null, trk = { trackingState: 'STOPPED', pending: 0 }, gps = null, kpi = null, destroyed = false, awake = false;
   const el = h('div', { class: 'home' });
   const tracker = createTracker({ api, provider, queue, userId, getSettings: () => (schedule && schedule.settings) || {}, getShift: () => (schedule && schedule.assignment) || null, intervalOverrideMs: cfg().TRACKING_INTERVAL_OVERRIDE_MS, onChange: (s) => { trk = s; if (s.ended) refresh(); render(); } });
 
   const seenHelp = () => { try { return !!globalThis.localStorage.getItem('gops.nativeHelp.' + userId); } catch (e) { return true; } };
   const markHelp = () => { try { globalThis.localStorage.setItem('gops.nativeHelp.' + userId, '1'); } catch (e) { /* ignore */ } };
   function readCache() { try { return JSON.parse(globalThis.localStorage.getItem(CACHE(userId))); } catch (e) { return null; } }
+  const currentMonth = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
   async function refresh() {
     try { schedule = await api.call('getTodaySchedule', {}); fromCache = false; loadError = null; try { globalThis.localStorage.setItem(CACHE(userId), JSON.stringify({ at: Date.now(), data: schedule })); } catch (e) { /* ignore */ } }
     catch (e) {
       if (['OFFLINE', 'NETWORK_ERROR', 'SERVER_UNAVAILABLE'].includes(e.code)) { const c = readCache(); if (c) { schedule = c.data; fromCache = c.at; loadError = null; } else loadError = e; } else loadError = e;
     }
-    syncTracker(); render(); loadHistory();
+    syncTracker(); render(); loadKpi();
     if (provider.capabilities.batterySettings && schedule && schedule.attendance && schedule.attendance.state === 'NOT_CHECKED_IN' && !seenHelp()) { markHelp(); openTrackingHelp({ provider }); }
   }
-  async function loadHistory() {
+  // d72: KPI الشخصي — جلب موازي خفيف بعد الجدول؛ فشله مبيكسرش الصفحة (لو الباك إند لسه مفيهوش getMyKpi الكارت بيفضل مخفي)
+  function loadKpi() {
     if (!isOnline()) return;
-    try { const to = todayLocal(); history = (await api.call('getAttendance', { date_from: addDays(to, -6), date_to: to })).items; } catch (e) { /* history is optional */ }
-    render();
+    api.call('getMyKpi', { month: currentMonth() }).then((res) => { kpi = res || null; render(); }).catch(() => { /* KPI اختياري */ });
   }
   function syncTracker() {
     if (!schedule) return;
@@ -49,6 +50,27 @@ export function createHome({ api, provider, queue }) {
   }
 
   /* ---- sections ---- */
+  /* ---- d72: كارت «مؤشرات أدائي» (بدل جدول آخر ٧ أيام) ---- */
+  function kpiCard() {
+    if (!kpi) return null;
+    const score = kpi.kpi_score != null ? kpi.kpi_score : null;
+    const scoreColor = score == null ? 'var(--muted)' : score >= 90 ? 'var(--ok)' : score >= 70 ? 'var(--warn)' : 'var(--bad)';
+    const scoreLabel = score == null ? '' : score >= 90 ? t('Excellent') : score >= 70 ? t('Good') : t('Needs improvement');
+    const metrics = Array.isArray(kpi.metrics) ? kpi.metrics : [];
+    return h('section', { class: 'card kpi-card', id: 'kpi-card' },
+      h('h2', {}, t('My KPI') + ' — ' + (kpi.month_label || currentMonth())),
+      score != null ? h('div', { style: 'display:flex;align-items:center;gap:14px;margin:10px 0 14px' },
+        h('span', { style: 'font-size:2.4rem;font-weight:700;color:' + scoreColor }, score + '%'),
+        h('div', {},
+          h('p', { style: 'margin:0;font-weight:600;color:' + scoreColor }, scoreLabel),
+          h('p', { style: 'margin:0;font-size:.82rem;color:var(--muted)' }, t('{n} days this month', { n: kpi.days_in_period || 0 }))))
+        : h('p', { class: 'hint' }, t('No KPI data yet this month.')),
+      metrics.length ? h('div', { id: 'kpi-metrics' },
+        ...metrics.map((m) => h('div', { class: 'kpi-row' },
+          h('span', { class: 'kpi-label' }, m.label),
+          h('span', { class: 'kpi-val', style: (m.value || 0) > 0 ? 'color:var(--bad)' : 'color:var(--ok)' },
+            (m.value || 0) > 0 ? (m.value + ' ' + (m.unit || '')) : '✓')))) : null);
+  }
   function shiftCard() {
     if (!schedule) return null;
     const a = schedule.assignment, sh = a && a.shift;
@@ -109,11 +131,6 @@ export function createHome({ api, provider, queue }) {
     if (!schedule || fromCache || !schedule.break || !schedule.attendance || schedule.attendance.state !== 'CHECKED_IN') return null;
     return breakCard({ schedule, api, provider, online: isOnline(), onDone: () => { refresh(); } });
   }
-  function historyCard() {
-    if (!history || !history.length) return null;
-    return h('section', { class: 'card' }, h('h2', {}, t('Last 7 days')), dataTable({ columns: [{ key: 'work_date', label: 'Date' }, { key: 'check_in_time', label: 'In', render: (r) => fmtTime(r.check_in_time) }, { key: 'check_out_time', label: 'Out', render: (r) => fmtTime(r.check_out_time) },
-      { key: 'attendance_status', label: 'Status', render: (r) => badge(r.attendance_status) }], rows: history }));
-  }
 
   function render() {
     if (destroyed) return;
@@ -121,7 +138,7 @@ export function createHome({ api, provider, queue }) {
       fromCache ? h('div', { class: 'alert alert-warn', id: 'cache-note' }, t('Showing your last saved schedule ({t}). Connect to refresh.', { t: fmtDateTime(new Date(fromCache).toISOString()) })) : null,
       loadError ? errorBox(loadError) : null, !schedule && !loadError ? spinner() : null,
       schedule ? h('div', { class: 'greeting' }, h('h1', {}, schedule.employee.name), h('p', { class: 'hint' }, t('Employee ID {id}', { id: schedule.employee.employee_id }))) : null,
-      shiftCard(), actions(), breakNode(), gpsCard(), trackingCard(), historyCard());
+      shiftCard(), actions(), breakNode(), gpsCard(), trackingCard(), kpiCard());
   }
   const onVis = () => { if (globalThis.document.visibilityState === 'visible') refresh(); };
   const onOnline = () => { tracker.onOnline(); refresh(); };
