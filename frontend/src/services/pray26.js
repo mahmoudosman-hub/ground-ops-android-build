@@ -8,7 +8,9 @@
  *      التشغيل بضغطتين: ضغطة أولى = الزر يسأل «متأكد؟»، ضغطة تانية = تنفيذ.
  * d51: الزر اتنقل من مكانه العائم تحت على اليمين إلى شريط التابات فوق،
  *      جنب تاب «الطلبات» مباشرة — بنفس منطق الشغل القديم بالظبط.
+ * d75: نصوص الزر من i18n (t()) — عشان النسخة الإنجليزية ميبقاش فيها عربي.
  */
+import { t } from '../core/i18n.js'; // d75
 (function () {
   'use strict';
   if (/admin\.html/i.test(window.location.pathname)) return;
@@ -54,7 +56,7 @@
       b = document.createElement('button');
       b.id = 'gops-pray-btn';
       b.type = 'button';
-      b.setAttribute('aria-label', 'بريك الصلاة');
+      b.setAttribute('aria-label', t('Prayer break'));
       b.addEventListener('click', onTap);
     }
     b.className = 'btn btn-small';
@@ -64,7 +66,7 @@
       'padding:4px 12px', 'white-space:nowrap', '-webkit-tap-highlight-color:transparent',
       'transition:background .2s'
     ].join(';');
-    b.innerHTML = '<span id="gops-pray-ic">🕌</span> <span id="gops-pray-tx">بريك الصلاة</span>';
+    b.innerHTML = '<span id="gops-pray-ic">🕌</span> <span id="gops-pray-tx">' + t('Prayer break') + '</span>';
     var req = document.getElementById('btn-tabs-refresh') || document.getElementById('tab-requests'); // d54: بعد زرار ⟳ الجديد لو موجود عشان الترتيب يبقى: الطلبات ← ⟳ ← الصلاة
     if (req && req.parentNode === tabs) req.insertAdjacentElement('afterend', b);
     else tabs.appendChild(b);
@@ -78,7 +80,7 @@
 
   // نص الزر وقت الصلاة: الإيقاف + الوقت المتبقي (مختصر عشان يتسع في شريط التابات)
   function prayLabel() {
-    return 'إيقاف 🤲 ' + fmt(remainSec);
+    return t('Stop 🤲 {t}', { t: fmt(remainSec) });
   }
 
   function setFace(icon, html, bg, pulse) {
@@ -115,7 +117,7 @@
       setFace('🤲', prayLabel(), '#8a5a00', true);
       startCountdown();
     } else {
-      setFace('🕌', 'بريك الصلاة', '#0e7a5f', false);
+      setFace('🕌', t('Prayer break'), '#0e7a5f', false);
       stopCountdown();
     }
   }
@@ -143,7 +145,7 @@
   function flashEnd() {
     flashing = true;
     mode = 'flash';
-    setFace('🕌', 'تم ✅', '#1b8a3a', false);
+    setFace('🕌', t('Done ✅'), '#1b8a3a', false);
     setTimeout(function () {
       flashing = false;
       mode = 'idle';
@@ -182,16 +184,16 @@
         flashEnd();
       } else if (!praying) {
         // ضغطة أولى: الزر نفسه بيسأل «متأكد؟»
-        transient('confirm-start', '⚠️', 'متأكد؟ دوس تاني', '#b45309', 6000, false);
+        transient('confirm-start', '⚠️', t('Sure? Tap again'), '#b45309', 6000, false);
       } else {
         // ضغطة أولى والصلاة شغالة: تأكيد القفل على الزر نفسه
-        transient('confirm-end', '⚠️', 'متأكد من الإيقاف؟', '#b3261e', 5000, false);
+        transient('confirm-end', '⚠️', t('Stop the break?'), '#b3261e', 5000, false);
       }
     } catch (e) {
       var msg = (e && e.message) || '';
       clearTransient();
-      if (msg.indexOf('checked in') >= 0) flashError('لازم Check In الأول');
-      else flashError('حصلت مشكلة — حاول تاني');
+      if (msg.indexOf('checked in') >= 0) flashError(t('You must Check In first'));
+      else flashError(t('Something went wrong — try again'));
     }
   }
 

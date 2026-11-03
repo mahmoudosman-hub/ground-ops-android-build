@@ -3,7 +3,9 @@
  * لما السيرفر يبعت "📍 نبضة موقع" والكابتن يفتح التطبيق من الإشعار،
  * الملف ده يبعت الموقع الحالي للسيرفر فوراً من غير أي ضغطة إضافية،
  * ويعرض تأكيد بسيط على الشاشة. بيشتغل على الآيفون PWA والويب عموماً.
+ * d75: الرسايل بتيجي من i18n (t()) — عشان النسخة الإنجليزية ميبقاش فيها عربي.
  */
+import { t } from '../core/i18n.js'; // d75
 (function () {
   'use strict';
   if (/admin\.html/i.test(window.location.pathname)) return;
@@ -47,8 +49,8 @@
 
   async function sendNow() {
     const sess = getSession();
-    if (!sess) return banner('سجل دخولك الأول عشان نقدر نأكد موقعك', false);
-    if (!('geolocation' in navigator)) return banner('الجهاز ده مش بيدعم تحديد الموقع', false);
+    if (!sess) return banner(t('Sign in first so we can verify your location'), false);
+    if (!('geolocation' in navigator)) return banner(t('This device does not support location'), false);
 
     let fix = null;
     try {
@@ -60,11 +62,11 @@
         );
       });
     } catch (e) {
-      return banner('معرفناش نحدد موقعك — اتأكد إن الـ GPS شغال وحاول تاني', false);
+      return banner(t('Could not get your location — make sure GPS is on and try again'), false);
     }
 
     const apiUrl = window.API_URL || (window.GOPS_CONFIG && window.GOPS_CONFIG.API_URL) || (window.CONFIG && window.CONFIG.API_URL);
-    if (!apiUrl) return banner('إعداد السيرفر ناقص — حاول تاني', false);
+    if (!apiUrl) return banner(t('Server settings missing — try again'), false);
 
     try {
       const res = await fetch(apiUrl, {
@@ -89,11 +91,11 @@
       });
       let out = null;
       try { out = await res.json(); } catch (e) { /* ignore */ }
-      if (out && out.success) banner('✅ تم إرسال موقعك — تمام', true);
-      else if (out && out.error_code === 'NO_ACTIVE_SHIFT') banner('مفيش شيفت شغال دلوقتي — مش محتاجين موقعك', false);
-      else banner((out && out.message) ? ('مبعتش الموقع: ' + out.message) : 'مبعتش الموقع — حاول تاني', false);
+      if (out && out.success) banner(t('✅ Your location was sent — all good'), true);
+      else if (out && out.error_code === 'NO_ACTIVE_SHIFT') banner(t('No active shift right now — we do not need your location'), false);
+      else banner((out && out.message) ? t('Location was not sent: {m}', { m: out.message }) : t('Location was not sent — try again'), false);
     } catch (e) {
-      banner('مفيش إنترنت — افتح التطبيق تاني لما الشبكة ترجع', false);
+      banner(t('No internet — open the app again when the network is back'), false);
     }
   }
 

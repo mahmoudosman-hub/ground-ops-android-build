@@ -23,16 +23,16 @@ function createIosLocationCard(api) {
   const input = h('input', {
     type: 'url',
     id: 'ios-gmaps-input',
-    placeholder: 'الصق رابط Google Maps هنا...',
-    style: 'width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:14px;box-sizing:border-box;direction:rtl'
+    placeholder: t('Paste your Google Maps link here...'),
+    style: 'width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:14px;box-sizing:border-box'
   });
 
   const statusEl = h('p', {
     id: 'ios-gmaps-status',
-    style: 'font-size:12px;color:#666;margin:6px 0 0;min-height:18px;text-align:right'
+    style: 'font-size:12px;color:#666;margin:6px 0 0;min-height:18px;text-align:start'
   });
 
-  const sendBtn = button('📍 شارك موقعي', {
+  const sendBtn = button(t('📍 Share my location'), {
     kind: 'primary',
     small: true,
     id: 'btn-ios-send',
@@ -40,22 +40,22 @@ function createIosLocationCard(api) {
       click: async () => {
         const url = (input.value || '').trim();
         if (!url) {
-          mount(statusEl, h('span', { style: 'color:#c00' }, '⚠️ الصق الرابط الأول'));
+          mount(statusEl, h('span', { style: 'color:#c00' }, t('⚠️ Paste the link first')));
           return;
         }
         // تحقق بسيط إن الرابط من Google Maps
         if (!/google\.com\/maps|maps\.app\.goo\.gl/.test(url)) {
-          mount(statusEl, h('span', { style: 'color:#c00' }, '❌ رابط مش صح — لازم يكون من Google Maps'));
+          mount(statusEl, h('span', { style: 'color:#c00' }, t('❌ Invalid link — it must be a Google Maps link')));
           return;
         }
         sendBtn.disabled = true;
-        mount(statusEl, h('span', { style: 'color:#888' }, '⏳ بيتحفظ...'));
+        mount(statusEl, h('span', { style: 'color:#888' }, t('⏳ Saving...')));
         try {
           await api.call('saveGmapsLink', { gmaps_link: url });
-          mount(statusEl, h('span', { style: 'color:#0a0' }, '✅ تم — الأدمن دلوقتي يقدر يتابع موقعك live'));
+          mount(statusEl, h('span', { style: 'color:#0a0' }, t('✅ Done — the admin can now track you live')));
           // ماسحش الـ input عشان الكابتن يقدر يشوف اللي بعته
         } catch (e) {
-          mount(statusEl, h('span', { style: 'color:#c00' }, '❌ ' + (e.message || 'حصل خطأ، حاول تاني')));
+          mount(statusEl, h('span', { style: 'color:#c00' }, '❌ ' + (e.message || t('Something went wrong, try again'))));
         }
         sendBtn.disabled = false;
       }
@@ -66,13 +66,13 @@ function createIosLocationCard(api) {
     id: 'ios-location-card',
     style: 'background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:14px;margin:12px 0'
   },
-    h('p', { style: 'font-weight:600;margin:0 0 4px;text-align:right;color:#5d4037' },
-      '📍 شارك موقعك مع الأدمن (iPhone)'
+    h('p', { style: 'font-weight:600;margin:0 0 4px;text-align:start;color:#5d4037' },
+      t('📍 Share your location with the admin (iPhone)')
     ),
-    h('p', { style: 'font-size:12px;color:#666;margin:0 0 10px;text-align:right;line-height:1.6' },
-      '١. افتح Google Maps', h('br'),
-      '٢. دوس على صورتك ← مشاركة الموقع ← اختار مدة (٨ ساعات مثلاً)', h('br'),
-      '٣. دوس "نسخ الرابط" والصقه هنا'
+    h('p', { style: 'font-size:12px;color:#666;margin:0 0 10px;text-align:start;line-height:1.6' },
+      t('1. Open Google Maps'), h('br'),
+      t('2. Tap your profile picture → Location sharing → choose a duration (e.g. 8 hours)'), h('br'),
+      t('3. Tap "Copy link" and paste it here')
     ),
     input,
     h('div', { style: 'margin-top:8px;display:flex;gap:8px;justify-content:flex-end' }, sendBtn),

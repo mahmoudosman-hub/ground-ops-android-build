@@ -4,7 +4,9 @@
  * 1. Extends the abort timeout from 30s to 90s (delay AbortController.abort).
  * 2. Auto-retries fetch on real network errors (max 2 retries).
  * 3. Shows a small "Retrying..." banner so the user knows what's happening.
+ * d75: نص البانر من i18n (t()).
  */
+import { t } from '../core/i18n.js'; // d75
 (function () {
   'use strict';
 
@@ -65,7 +67,7 @@
     function attempt(n) {
       return originalFetch(input, init).catch(function (err) {
         if (!isRetriable(err) || n >= MAX_RETRIES) throw err;
-        showBanner('الاتصال بطيء - إعادة المحاولة (' + (n + 1) + '/' + MAX_RETRIES + ')...');
+        showBanner(t('Slow connection - retrying ({a}/{b})...', { a: (n + 1), b: MAX_RETRIES }));
         var newInit = Object.assign({}, init);
         delete newInit.signal;
         return new Promise(function (resolve, reject) {

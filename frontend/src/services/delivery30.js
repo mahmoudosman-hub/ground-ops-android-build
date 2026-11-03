@@ -1,6 +1,8 @@
 /**
  * Ground OPS - Delivery 30 (Checkout Warning + Cache Fix)
+ * d75: رسالة التأكيد من i18n (t()) + كشف زرار الانصراف بالعربي كمان.
  */
+import { t } from '../core/i18n.js'; // d75
 (function () {
   'use strict';
   if (/admin\.html/i.test(window.location.pathname)) return;
@@ -12,8 +14,8 @@
     if (!btn) return;
     var text = (btn.innerText || "").toLowerCase();
     
-    // لو داس على Check Out
-    if (text.includes('check out')) {
+    // لو داس على Check Out (بالإنجليزي أو العربي)
+    if (text.includes('check out') || text.includes('تسجيل الانصراف')) {
       var now = new Date();
       var hours = now.getHours();
       var mins = now.getMinutes();
@@ -21,7 +23,7 @@
       
       // لو الوقت قبل 6 مساءً (18:00) مثلاً، نعتبره انصراف مبكر
       if (timeVal < 18) {
-        if (!origConfirm('أنت على وشك تسجيل الانصراف قبل نهاية الشيفت. هل أنت متأكد؟')) {
+        if (!origConfirm(t('You are about to check out before your shift ends. Are you sure?'))) {
            e.preventDefault();
            e.stopPropagation();
            return false;

@@ -1,7 +1,9 @@
 /**
  * Ground OPS - Delivery 18 v4
  * Late permission - creates PENDING_ADMIN directly, no submitRequest step.
+ * d75: كل نصوص المودال من i18n (t()) — كان كله إنجليزي هاردكود بيظهر في النسخة العربية.
  */
+import { t } from '../core/i18n.js'; // d75
 (function () {
   'use strict';
 
@@ -33,12 +35,12 @@
   }
   function call(action, payload) {
     return api().then(function () {
-      var t = token();
-      if (!t) throw new Error('Not signed in');
+      var tk = token();
+      if (!tk) throw new Error('Not signed in');
       return fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: action, token: t, payload: payload, client: 'delivery18/4' }),
+        body: JSON.stringify({ action: action, token: tk, payload: payload, client: 'delivery18/4' }),
         redirect: 'follow',
         credentials: 'omit'
       }).then(function (r) { return r.json(); }).then(function (b) {
@@ -95,14 +97,14 @@
     ov.innerHTML =
       '<div style="background:#fff;border-radius:14px;max-width:480px;width:100%;padding:22px;font:15px/1.5 system-ui,-apple-system,sans-serif;color:#111">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
-          '<h2 style="margin:0;font-size:19px">⏰ Late permission</h2>' +
+          '<h2 style="margin:0;font-size:19px">' + t('⏰ Late permission') + '</h2>' +
           '<button id="gops-late-close" style="background:transparent;border:0;font-size:24px;cursor:pointer;color:#666">×</button>' +
         '</div>' +
-        '<p style="margin:0 0 14px;color:#666;font-size:13px">Ask the admin for permission to arrive later than your shift start.</p>' +
-        '<label style="display:block;margin-bottom:10px"><span style="display:block;font-weight:600;margin-bottom:4px;font-size:13px">Date</span>' +
+        '<p style="margin:0 0 14px;color:#666;font-size:13px">' + t('Ask the admin for permission to arrive later than your shift start.') + '</p>' +
+        '<label style="display:block;margin-bottom:10px"><span style="display:block;font-weight:600;margin-bottom:4px;font-size:13px">' + t('Date') + '</span>' +
         '<input type="date" id="gops-late-date" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;font-size:15px;box-sizing:border-box"></label>' +
         '<div style="display:block;margin-bottom:10px">' +
-          '<span style="display:block;font-weight:600;margin-bottom:4px;font-size:13px">I will arrive at</span>' +
+          '<span style="display:block;font-weight:600;margin-bottom:4px;font-size:13px">' + t('I will arrive at') + '</span>' +
           '<div style="display:flex;gap:8px">' +
             '<select id="gops-late-hour" style="flex:1;padding:10px;border:1px solid #ccc;border-radius:8px;font-size:15px">' + hourOptions() + '</select>' +
             '<select id="gops-late-min" style="flex:1;padding:10px;border:1px solid #ccc;border-radius:8px;font-size:15px">' + minuteOptions() + '</select>' +
@@ -111,16 +113,16 @@
               '<option value="PM" selected>PM</option>' +
             '</select>' +
           '</div>' +
-          '<div style="margin-top:6px;font-size:12px;color:#666" id="gops-late-preview">Time: 1:00 PM</div>' +
+          '<div style="margin-top:6px;font-size:12px;color:#666" id="gops-late-preview"></div>' +
         '</div>' +
-        '<label style="display:block;margin-bottom:10px"><span style="display:block;font-weight:600;margin-bottom:4px;font-size:13px">Reason <span style="color:#c00">*</span></span>' +
-        '<textarea id="gops-late-note" maxlength="300" rows="3" placeholder="Traffic, family, doctor, ..." style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea></label>' +
-        '<label style="display:block;margin-bottom:14px"><span style="display:block;font-weight:600;margin-bottom:4px;font-size:13px">Photo (optional)</span>' +
+        '<label style="display:block;margin-bottom:10px"><span style="display:block;font-weight:600;margin-bottom:4px;font-size:13px">' + t('Reason') + ' <span style="color:#c00">*</span></span>' +
+        '<textarea id="gops-late-note" maxlength="300" rows="3" placeholder="' + t('Traffic, family, doctor, ...') + '" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;font-size:14px;font-family:inherit;resize:vertical;box-sizing:border-box"></textarea></label>' +
+        '<label style="display:block;margin-bottom:14px"><span style="display:block;font-weight:600;margin-bottom:4px;font-size:13px">' + t('Photo (optional)') + '</span>' +
         '<input type="file" id="gops-late-file" accept="image/*,application/pdf" style="width:100%;font-size:13px"></label>' +
         '<div id="gops-late-err" style="color:#c00;font-size:13px;min-height:18px;margin-bottom:10px"></div>' +
         '<div style="display:flex;gap:8px">' +
-          '<button id="gops-late-cancel" style="flex:1;padding:12px;border:1px solid #ccc;border-radius:8px;background:#fff;font-weight:600;cursor:pointer">Cancel</button>' +
-          '<button id="gops-late-submit" style="flex:2;padding:12px;border:0;border-radius:8px;background:#0a84ff;color:#fff;font-weight:700;cursor:pointer">Send request</button>' +
+          '<button id="gops-late-cancel" style="flex:1;padding:12px;border:1px solid #ccc;border-radius:8px;background:#fff;font-weight:600;cursor:pointer">' + t('Cancel') + '</button>' +
+          '<button id="gops-late-submit" style="flex:2;padding:12px;border:0;border-radius:8px;background:#0a84ff;color:#fff;font-weight:700;cursor:pointer">' + t('Send request') + '</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(ov);
@@ -134,7 +136,7 @@
     dateI.value = fmtDate(new Date());
 
     function updatePreview() {
-      preview.textContent = 'Time: ' + hourI.value + ':' + minI.value + ' ' + ampmI.value;
+      preview.textContent = t('Time: {t}', { t: hourI.value + ':' + minI.value + ' ' + ampmI.value });
     }
     hourI.onchange = updatePreview;
     minI.onchange = updatePreview;
@@ -154,9 +156,9 @@
       var err = ov.querySelector('#gops-late-err');
       err.textContent = '';
 
-      if (!date) { err.textContent = 'Pick a date.'; return; }
-      if (!h || h < 1 || h > 12) { err.textContent = 'Pick an hour.'; return; }
-      if (!note) { err.textContent = 'Write a reason.'; return; }
+      if (!date) { err.textContent = t('Pick a date.'); return; }
+      if (!h || h < 1 || h > 12) { err.textContent = t('Pick an hour.'); return; }
+      if (!note) { err.textContent = t('Write a reason.'); return; }
 
       var h24 = h;
       if (ampm === 'PM' && h !== 12) h24 = h + 12;
@@ -166,7 +168,7 @@
       btn.disabled = true;
       btn.style.opacity = '.7';
       var origText = btn.textContent;
-      btn.textContent = 'Sending...';
+      btn.textContent = t('Sending...');
 
       // 1) createRequest now sets the request directly to PENDING_ADMIN
       call('createRequest', { type: 'LATE_PERMISSION', date_from: date, time_value: timeStr, note: note })
@@ -184,14 +186,14 @@
         })
         .then(function () {
           ov.remove();
-          toast('Late permission request sent ✅');
+          toast(t('Late permission request sent ✅'));
           setTimeout(function () { location.reload(); }, 800);
         })
         .catch(function (e) {
           btn.disabled = false;
           btn.style.opacity = '';
           btn.textContent = origText;
-          err.textContent = e.message || e.code || 'Failed';
+          err.textContent = e.message || e.code || t('Failed');
         });
     };
   }
@@ -201,15 +203,15 @@
     var btns = document.querySelectorAll('button');
     var earlyBtn = null;
     for (var i = 0; i < btns.length; i++) {
-      var t = (btns[i].textContent || '').trim().toLowerCase();
-      if (t === 'early leave' || t === 'إذن انصراف مبكر' || t === 'early-leave') { earlyBtn = btns[i]; break; }
+      var lbl = (btns[i].textContent || '').trim().toLowerCase();
+      if (lbl === 'early leave' || lbl === 'إذن انصراف مبكر' || lbl === 'انصراف مبكر' || lbl === 'early-leave') { earlyBtn = btns[i]; break; }
     }
     if (!earlyBtn) return;
     var parent = earlyBtn.parentNode;
     if (!parent) return;
     var b = document.createElement('button');
     b.id = 'gops-late-btn';
-    b.textContent = '⏰ Late permission';
+    b.textContent = t('⏰ Late permission');
     b.style.cssText = 'padding:10px 16px;border:0;border-radius:8px;background:#f39c12;color:#fff;font-weight:700;cursor:pointer;font-size:14px;';
     b.onclick = openModal;
     parent.appendChild(b);

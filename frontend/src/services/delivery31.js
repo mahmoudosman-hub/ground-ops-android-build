@@ -1,6 +1,8 @@
 /**
  * Ground OPS - Delivery 31 v3 (Fixed Employee List)
+ * d75: كل نصوص اللوحة من i18n (t()) — كانت عربي هاردكود بيظهر في النسخة الإنجليزية.
  */
+import { t } from '../core/i18n.js'; // d75
 (function () {
   'use strict';
   if (!/admin\.html/i.test(window.location.pathname)) return;
@@ -22,7 +24,7 @@
     var a = document.createElement('a');
     a.id = 'gops-admin-notif-btn';
     a.href = '#';
-    a.textContent = '📢 إرسال إشعار';
+    a.textContent = t('📢 Send notification');
     a.style.cssText = 'display:block;padding:10px 14px;color:inherit;text-decoration:none;cursor:pointer;font-weight:bold;margin-top:10px;border-top:1px solid #eee;';
     a.onclick = function(ev) { ev.preventDefault(); openNotifModal(); };
     nav.appendChild(a);
@@ -33,7 +35,7 @@
     if (old) old.remove();
 
     var sess = getSession();
-    if (!sess) { alert('انتهت الجلسة، يرجى تسجيل الدخول مرة أخرى.'); return; }
+    if (!sess) { alert(t('Session ended, please sign in again.')); return; }
     
     var token = sess.token;
     var apiUrl = window.API_URL || window.GOPS_CONFIG?.API_URL || window.CONFIG?.API_URL;
@@ -42,7 +44,7 @@
     var modal = document.createElement('div');
     modal.id = 'gops-notif-modal';
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
-    modal.innerHTML = '<div style="color:#fff;font:16px system-ui;">جاري جلب القائمة...</div>';
+    modal.innerHTML = '<div style="color:#fff;font:16px system-ui;">' + t('Loading the list...') + '</div>';
     document.body.appendChild(modal);
 
     // جلب الموظفين والفروع
@@ -68,50 +70,50 @@
         branches = results[1].data.branches;
       }
       
-      var empOpts = '<option value="">-- اختر الكابتن --</option>' + emps.map(function(e) { return '<option value="' + e.employee_id + '">' + e.employee_name + ' (' + e.employee_id + ')</option>'; }).join('');
-      var branchOpts = '<option value="">-- اختر الفرع --</option>' + branches.map(function(b) { return '<option value="' + b.branch_id + '">' + b.branch_name + '</option>'; }).join('');
+      var empOpts = '<option value="">' + t('-- Select captain --') + '</option>' + emps.map(function(e) { return '<option value="' + e.employee_id + '">' + e.employee_name + ' (' + e.employee_id + ')</option>'; }).join('');
+      var branchOpts = '<option value="">' + t('-- Select branch --') + '</option>' + branches.map(function(b) { return '<option value="' + b.branch_id + '">' + b.branch_name + '</option>'; }).join('');
 
       modal.innerHTML = 
         '<div style="background:#fff;border-radius:12px;max-width:500px;width:100%;padding:20px;font:15px/1.5 system-ui,sans-serif;color:#111;">' +
-          '<h2 style="margin:0 0 15px;">📢 إرسال إشعار مخصص</h2>' +
+          '<h2 style="margin:0 0 15px;">' + t('📢 Send custom notification') + '</h2>' +
           
-          '<label style="display:block;margin-bottom:10px;font-weight:600;">المرسل إليه:</label>' +
+          '<label style="display:block;margin-bottom:10px;font-weight:600;">' + t('Recipient:') + '</label>' +
           '<select id="gops-notif-target" style="width:100%;padding:10px;margin-bottom:15px;border:1px solid #ccc;border-radius:8px;">' +
-            '<option value="ALL">👥 كل الكباتن</option>' +
-            '<option value="BRANCH">🏢 فرع معين</option>' +
-            '<option value="EMPLOYEE">👤 كابتن معين</option>' +
+            '<option value="ALL">' + t('👥 All captains') + '</option>' +
+            '<option value="BRANCH">' + t('🏢 Specific branch') + '</option>' +
+            '<option value="EMPLOYEE">' + t('👤 Specific captain') + '</option>' +
           '</select>' +
 
           '<div id="gops-notif-branch-wrap" style="display:none; margin-bottom:15px;">' +
-            '<label style="display:block;margin-bottom:10px;font-weight:600;">اختر الفرع:</label>' +
+            '<label style="display:block;margin-bottom:10px;font-weight:600;">' + t('Choose branch:') + '</label>' +
             '<select id="gops-notif-branch" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;">' + branchOpts + '</select>' +
           '</div>' +
 
           '<div id="gops-notif-emp-wrap" style="display:none; margin-bottom:15px;">' +
-            '<label style="display:block;margin-bottom:10px;font-weight:600;">اختر الكابتن:</label>' +
+            '<label style="display:block;margin-bottom:10px;font-weight:600;">' + t('Choose captain:') + '</label>' +
             '<select id="gops-notif-emp" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:8px;">' + empOpts + '</select>' +
           '</div>' +
 
-          '<label style="display:block;margin-bottom:10px;font-weight:600;">نوع الإشعار (Template):</label>' +
+          '<label style="display:block;margin-bottom:10px;font-weight:600;">' + t('Notification type (template):') + '</label>' +
           '<select id="gops-notif-type" style="width:100%;padding:10px;margin-bottom:15px;border:1px solid #ccc;border-radius:8px;">' +
-            '<option value="update">تحديث التطبيق (رابط)</option>' +
-            '<option value="missed_selfie">فاتك سيلفي تشيك</option>' +
-            '<option value="long_break">بريك طويل</option>' +
-            '<option value="custom">رسالة مخصصة</option>' +
+            '<option value="update">' + t('App update (link)') + '</option>' +
+            '<option value="missed_selfie">' + t('Missed selfie check') + '</option>' +
+            '<option value="long_break">' + t('Long break') + '</option>' +
+            '<option value="custom">' + t('Custom message') + '</option>' +
           '</select>' +
 
-          '<label style="display:block;margin-bottom:10px;font-weight:600;">عنوان الرسالة:</label>' +
-          '<input type="text" id="gops-notif-title" style="width:100%;padding:10px;margin-bottom:15px;border:1px solid #ccc;border-radius:8px;" placeholder="اكتب العنوان هنا...">' +
+          '<label style="display:block;margin-bottom:10px;font-weight:600;">' + t('Message title:') + '</label>' +
+          '<input type="text" id="gops-notif-title" style="width:100%;padding:10px;margin-bottom:15px;border:1px solid #ccc;border-radius:8px;" placeholder="' + t('Write the title here...') + '">' +
           
-          '<label style="display:block;margin-bottom:10px;font-weight:600;">نص الرسالة:</label>' +
-          '<textarea id="gops-notif-body" rows="3" style="width:100%;padding:10px;margin-bottom:15px;border:1px solid #ccc;border-radius:8px;" placeholder="اكتب نص الرسالة هنا..."></textarea>' +
+          '<label style="display:block;margin-bottom:10px;font-weight:600;">' + t('Message body:') + '</label>' +
+          '<textarea id="gops-notif-body" rows="3" style="width:100%;padding:10px;margin-bottom:15px;border:1px solid #ccc;border-radius:8px;" placeholder="' + t('Write the message body here...') + '"></textarea>' +
           
-          '<label style="display:block;margin-bottom:10px;font-weight:600;">رابط (اختياري - للتحديث):</label>' +
+          '<label style="display:block;margin-bottom:10px;font-weight:600;">' + t('Link (optional - for the update):') + '</label>' +
           '<input type="text" id="gops-notif-url" style="width:100%;padding:10px;margin-bottom:15px;border:1px solid #ccc;border-radius:8px;" placeholder="https://...">' +
           
           '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
-            '<button id="gops-notif-cancel" style="padding:10px 20px;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer;">إلغاء</button>' +
-            '<button id="gops-notif-send" style="padding:10px 20px;border:0;border-radius:8px;background:#0a84ff;color:#fff;font-weight:bold;cursor:pointer;">إرسال الإشعار</button>' +
+            '<button id="gops-notif-cancel" style="padding:10px 20px;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer;">' + t('Cancel') + '</button>' +
+            '<button id="gops-notif-send" style="padding:10px 20px;border:0;border-radius:8px;background:#0a84ff;color:#fff;font-weight:bold;cursor:pointer;">' + t('Send notification') + '</button>' +
           '</div>' +
           '<div id="gops-notif-err" style="color:#c00;margin-top:10px;text-align:center;"></div>' +
         '</div>';
@@ -133,9 +135,9 @@
 
       typeSel.onchange = function() {
         var v = typeSel.value;
-        if (v === 'update') { titleIn.value = 'تحديث جديد للتطبيق'; bodyIn.value = 'يرجى تحديث التطبيق الآن للحصول على آخر الميزات.'; urlIn.value = 'https://mahmoudosman-hub.github.io/ground-ops-frontend/index.html'; }
-        else if (v === 'missed_selfie') { titleIn.value = '📸 لقد فاتك سيلفي تشيك'; bodyIn.value = 'يرجى فتح التطبيق والتقاط صورة سيلفي الآن.'; urlIn.value = ''; }
-        else if (v === 'long_break') { titleIn.value = '☕ بريك طويل'; bodyIn.value = 'لقد تجاوزت مدة البريك المسموح بها. يرجى العودة للعمل.'; urlIn.value = ''; }
+        if (v === 'update') { titleIn.value = t('New app update'); bodyIn.value = t('Please update the app now to get the latest features.'); urlIn.value = 'https://mahmoudosman-hub.github.io/ground-ops-frontend/index.html'; }
+        else if (v === 'missed_selfie') { titleIn.value = t('📸 You missed a selfie check'); bodyIn.value = t('Please open the app and take a selfie now.'); urlIn.value = ''; }
+        else if (v === 'long_break') { titleIn.value = t('☕ Long break'); bodyIn.value = t('You exceeded the allowed break time. Please return to work.'); urlIn.value = ''; }
         else { titleIn.value = ''; bodyIn.value = ''; urlIn.value = ''; }
       };
       typeSel.dispatchEvent(new Event('change'));
@@ -154,10 +156,10 @@
         if (targetType === 'BRANCH') payload.branch_id = document.getElementById('gops-notif-branch').value;
         if (targetType === 'EMPLOYEE') payload.employee_id = document.getElementById('gops-notif-emp').value;
 
-        if (!payload.title || !payload.body) { errDiv.textContent = 'يرجى كتابة عنوان ونص الرسالة.'; return; }
+        if (!payload.title || !payload.body) { errDiv.textContent = t('Please write a title and a message body.'); return; }
 
         sendBtn.disabled = true;
-        sendBtn.textContent = 'جاري الإرسال...';
+        sendBtn.textContent = t('Sending...');
         errDiv.textContent = '';
 
         fetch(apiUrl, {
@@ -166,26 +168,26 @@
         }).then(function(r) { return r.json(); }).then(function(res) {
           if (res.success) {
             errDiv.style.color = '#1e8e3e'; 
-            errDiv.textContent = '✅ تم الإرسال بنجاح لـ ' + res.data.sent + ' جهاز!'; 
+            errDiv.textContent = t('✅ Sent successfully to {n} devices!', { n: res.data.sent }); 
             setTimeout(function() { modal.remove(); }, 2000);
           } else {
             errDiv.style.color = '#c00'; 
             errDiv.textContent = res.message; 
             sendBtn.disabled = false;
-            sendBtn.textContent = 'إرسال الإشعار';
+            sendBtn.textContent = t('Send notification');
           }
         }).catch(function() {
           errDiv.style.color = '#c00'; 
-          errDiv.textContent = 'خطأ في الاتصال بالسيرفر.'; 
+          errDiv.textContent = t('Server connection error.'); 
           sendBtn.disabled = false;
-          sendBtn.textContent = 'إرسال الإشعار';
+          sendBtn.textContent = t('Send notification');
         });
       };
     }).catch(function(e) {
       modal.innerHTML = '<div style="background:#fff;padding:20px;border-radius:12px;text-align:center;">' +
-        '<div style="color:#c00;font-weight:bold;margin-bottom:10px;">فشل جلب القائمة</div>' +
+        '<div style="color:#c00;font-weight:bold;margin-bottom:10px;">' + t('Failed to load the list') + '</div>' +
         '<div style="font-size:13px;color:#666;margin-bottom:15px;">' + e.message + '</div>' +
-        '<button id="gops-notif-err-close" style="padding:10px 20px;border:0;border-radius:8px;background:#111;color:#fff;cursor:pointer;">إغلاق</button>' +
+        '<button id="gops-notif-err-close" style="padding:10px 20px;border:0;border-radius:8px;background:#111;color:#fff;cursor:pointer;">' + t('Close') + '</button>' +
         '</div>';
       document.getElementById('gops-notif-err-close').onclick = function() { modal.remove(); };
     });

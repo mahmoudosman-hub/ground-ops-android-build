@@ -11,7 +11,9 @@
  * 2) عمليات الحضور والبريك بياخد تأخير عشوائي صغير (0-500ms) قبل
  *    الإرسال — عشان الدوسات المتزامنة متوصلكش للسيرفر كلها مرة
  *    واحدة وتتصطف في طابور طويل. مش هتحس بيها، بس بتفرق كتير.
+ * d75: نص البانر من i18n (t()).
  */
+import { t } from '../core/i18n.js'; // d75
 (function () {
   'use strict';
 
@@ -60,7 +62,7 @@
           if (ct.indexOf('json') < 0) return res;
           return res.clone().json().then(function (j) {
             if (!isBusyBody(j) || n >= MAX_RETRIES) return res;
-            showBanner('السيرفر فيه زحمة دلوقتي (وقت تغيير الشيفتات) — بنحاول تاني تلقائي (' + (n + 1) + '/' + MAX_RETRIES + ')...');
+            showBanner(t('Server is busy right now (shift change time) — retrying automatically ({a}/{b})...', { a: (n + 1), b: MAX_RETRIES }));
             return new Promise(function (resolve) {
               setTimeout(function () { resolve(attempt(n + 1)); }, 1500 * (n + 1));
             });
