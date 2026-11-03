@@ -1,6 +1,6 @@
 /* ============================================================
    Ground OPS Tracker — styles/app.css
-   Talabat color system + Dark Mode (d71)
+   Talabat color system + Dark Mode (d74)
    ============================================================ */
 
 /* ============================================================
@@ -25,10 +25,10 @@
   --text:  #411517;
   --muted: #595959;
 
-  --sidebar-bg:        #411517;
+  --sidebar-bg:        #2C0E10;
   --sidebar-text:      #F4EDE3;
-  --sidebar-muted:     #9E8070;
-  --sidebar-hover:     #5C1D20;
+  --sidebar-muted:     #C4A090;
+  --sidebar-hover:     #3D1416;
   --sidebar-active-bg: #FF5900;
 
   --ok:      #2E7D32; --ok-bg:   #E8F5E9;
@@ -46,16 +46,16 @@
 
 /* ---- Dark mode (Burgundy dark theme) ---- */
 [data-theme="dark"] {
-  --bg:    #1A0A0B;
-  --card:  #2A1215;
-  --line:  #411517;
+  --bg:    #221010;
+  --card:  #2E1618;
+  --line:  #4A2020;
   --text:  #F4EDE3;
-  --muted: #9E8070;
+  --muted: #B09080;
 
-  --sidebar-bg:        #0D0506;
+  --sidebar-bg:        #180A0B;
   --sidebar-text:      #F4EDE3;
-  --sidebar-muted:     #7A5A50;
-  --sidebar-hover:     #1A0A0B;
+  --sidebar-muted:     #9A7060;
+  --sidebar-hover:     #261214;
   --sidebar-active-bg: #FF5900;
 
   --brand-bg: #3A1210;
@@ -71,16 +71,16 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --bg:    #1A0A0B;
-    --card:  #2A1215;
-    --line:  #411517;
+    --bg:    #221010;
+    --card:  #2E1618;
+    --line:  #4A2020;
     --text:  #F4EDE3;
-    --muted: #9E8070;
+    --muted: #B09080;
 
-    --sidebar-bg:        #0D0506;
+    --sidebar-bg:        #180A0B;
     --sidebar-text:      #F4EDE3;
-    --sidebar-muted:     #7A5A50;
-    --sidebar-hover:     #1A0A0B;
+    --sidebar-muted:     #9A7060;
+    --sidebar-hover:     #261214;
     --sidebar-active-bg: #FF5900;
 
     --brand-bg: #3A1210;
@@ -354,7 +354,9 @@ input[type=checkbox] { width: 24px; height: 24px; min-height: 0; accent-color: v
 .kpi-label { color: var(--muted); }
 .kpi-val { font-weight: 600; }
 
-/* ---- d71 compat: قواعد من النسخة القديمة اتأكدت من الكود عشان مفيش حاجة تفقد تنسيقها ---- */
+/* ---- d74 compat: قواعد من النسخة القديمة اتأكدت من الكود عشان مفيش حاجة تفقد تنسيقها ----
+   .big = وقت الشيفت + عداد البريك + رصيد الإجازات | .sr-only = إنبت السيلفي | .btn-danger = زرار Check Out
+   .app-header .ver = شريحة رقم النسخة في هيدر الأدمن | small = «(ends next day)» | greeting = ترحيب الهوم */
 html { -webkit-text-size-adjust: 100%; }
 body { padding-inline: env(safe-area-inset-left) env(safe-area-inset-right); }
 :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
