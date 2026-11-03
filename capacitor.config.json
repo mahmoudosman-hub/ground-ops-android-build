@@ -1,10 +1,10 @@
 {
-  "appId": "com.groundops.tracker",
-  "appName": "Ground OPS Tracker",
-  "webDir": "frontend",
-  "plugins": {
-    "App": {
-      "versionName": "1.0.13"
-    }
+ "appId": "com.groundops.tracker",
+ "appName": "Ground OPS Tracker",
+ "webDir": "frontend",
+ "plugins": {
+  "App": {
+   "versionName": "1.0.14"
   }
+ }
 }

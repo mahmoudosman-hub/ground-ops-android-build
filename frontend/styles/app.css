@@ -279,6 +279,7 @@ input[type=checkbox] { width: 24px; height: 24px; min-height: 0; accent-color: v
 .sidebar {
   position: fixed; inset-block: 0; inset-inline-start: 0; width: 260px;
   background: var(--sidebar-bg);
+  color: var(--sidebar-text); /* d76: الإصلاح — العناصر المحقونة (Language/Week Grid/Selfie/Auto Scheduler/إشعار) بـ color:inherit كانت بترث لون الـ body الغامق في اللايت فتختفي على الخلفية الغامقة */
   border-inline-end: 2px solid #FF5900;
   padding: 64px 8px 12px; transform: translateX(-100%); transition: transform .2s; z-index: 15; overflow-y: auto;
 }
