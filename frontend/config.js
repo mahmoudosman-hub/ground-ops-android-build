@@ -13,6 +13,6 @@ window.GOPS_CONFIG = Object.freeze({
   TRACKING_TIMEOUT: 15,              // minutes without a fix => "Tracking unavailable"
   DISABLE_MAP: false,                // true = never load Leaflet/OpenStreetMap tiles (tables still work)
   TRACKING_INTERVAL_OVERRIDE_MS: 0,  // TESTING ONLY - keep 0 in production
-  DEFAULT_LOCALE: 'en',
+  DEFAULT_LOCALE: 'ar',              // العربي هو اللغة الافتراضية (d47) — بيتغير من زرار «عربي / EN» في الهيدر
   RTL_LOCALES: ['ar']
 });

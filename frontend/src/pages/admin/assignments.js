@@ -32,6 +32,7 @@ export async function assignmentsPage(ctx) {
     m.setBody(f.el);
   }
   /* S16: تبديل بين كابتنين في نفس اليوم — مسموح حتى بعد تسجيل الحضور، وبيبعت إشعار للاتنين */
+  /* d60: من غير نافذة تأكيد — أول ما تدوس «بدّل» يطبق على طول (بطلب المستخدم)، والنتيجة بتظهر في رسالة */
   function swapDialog() {
     const m = openModal({ title: t('Swap captains') });
     const empOpts = ctx.lookups.employeeOpts(l, t('Select employee...'));
@@ -41,8 +42,6 @@ export async function assignmentsPage(ctx) {
       { name: 'employee_id_b', label: 'Captain 2', type: 'select', required: true, options: empOpts }],
       {}, { cancel: () => m.close(), submitLabel: t('Swap'), onSubmit: async (v) => {
         if (v.employee_id_a === v.employee_id_b) throw Object.assign(new Error(t('Pick two different captains.')), { code: 'VALIDATION_ERROR' });
-        const msg = t('Swap the shifts of {a} and {b} on {d}? Each one gets a notification with the new branch.', { a: en[v.employee_id_a] || v.employee_id_a, b: en[v.employee_id_b] || v.employee_id_b, d: v.work_date });
-        if (!(await confirmDialog(msg))) return;
         const busy = toast(t('Swapping... please wait'), 'info', 30000); // تغذية فورية: كان بيصمت لحد ما السيرفر يرد
         let res;
         try { res = await ctx.api.call('swapAssignments', { employee_id_a: v.employee_id_a, employee_id_b: v.employee_id_b, work_date: v.work_date }); }

@@ -33,13 +33,55 @@ export async function scheduleImportPage(ctx) {
     mount(box, head, cards, h('h2', {}, t('Changes ({n})', { n: res.changes_total })), changes, issues);
   }
 
+  // ── timeout helper ──────────────────────────────────────────────────
+  // Apps Script بياخد لحد 6 دقائق — بنضيف timeout 50 ثانية للـ Apply
+  // لو السيرفر اتأخر → نعرض رسالة "تم وممكن تحديث" بدل ما يفضل loading
+  function withTimeout(promise, ms) {
+    return new Promise((resolve, reject) => {
+      const timer = globalThis.setTimeout(
+        () => reject(Object.assign(new Error('TIMEOUT'), { code: 'TIMEOUT' })),
+        ms
+      );
+      promise.then(
+        (v) => { globalThis.clearTimeout(timer); resolve(v); },
+        (e) => { globalThis.clearTimeout(timer); reject(e); }
+      );
+    });
+  }
+  // ───────────────────────────────────────────────────────────────────
+
   async function run(apply) {
     mount(box, spinner(t(apply ? 'Applying...' : 'Reading the roster...')));
     previewBtn.disabled = applyBtn.disabled = true;
-    try { const res = await ctx.api.call(apply ? 'applyScheduleImport' : 'previewScheduleImport', {}); preview = apply ? null : res; render(res, apply); if (apply) { toast(res.held ? t('Held') : t('Applied'), res.held ? 'warn' : 'ok'); loadStatus(); } }
-    catch (e) { preview = null; mount(box, errorBox(e)); }
-    finally { previewBtn.disabled = false; applyBtn.disabled = !preview || !preview.changes_total; }
+    try {
+      // Apply: timeout 50 ثانية — Preview: timeout 40 ثانية
+      const res = await withTimeout(
+        ctx.api.call(apply ? 'applyScheduleImport' : 'previewScheduleImport', {}),
+        apply ? 50000 : 40000
+      );
+      preview = apply ? null : res;
+      render(res, apply);
+      if (apply) { toast(res.held ? t('Held') : t('Applied'), res.held ? 'warn' : 'ok'); loadStatus(); }
+    } catch (e) {
+      preview = null;
+      // لو timeout أثناء Apply → الغالب إن السيرفر نجح بس اتأخر في الرد
+      if (apply && e.code === 'TIMEOUT') {
+        mount(box, h('div', { class: 'alert alert-warn' },
+          t('The server is taking longer than expected. The changes were most likely applied successfully.'),
+          ' ',
+          h('a', { href: '', on: { click: (ev) => { ev.preventDefault(); globalThis.location.reload(); } } }, t('Reload the page to confirm.'))
+        ));
+        toast(t('Taking longer than expected — reload to confirm'), 'warn');
+        loadStatus();
+      } else {
+        mount(box, errorBox(e));
+      }
+    } finally {
+      previewBtn.disabled = false;
+      applyBtn.disabled = !preview || !preview.changes_total;
+    }
   }
+
   previewBtn = button(t('Preview'), { kind: 'primary', id: 'btn-import-preview', disabled: !can, on: { click: () => run(false) } });
   applyBtn = button(t('Apply'), { id: 'btn-import-apply', disabled: true, on: { click: async () => { if (await confirmDialog(t('Apply {n} change(s) from the roster to the assignments?', { n: preview.changes_total }))) run(true); } } });
   loadStatus();

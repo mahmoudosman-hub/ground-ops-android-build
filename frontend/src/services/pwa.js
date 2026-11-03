@@ -3,6 +3,21 @@ let deferred = null; const subs = new Set();
 export function initPwa(env = globalThis) {
   env.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferred = e; subs.forEach((f) => f()); });
   env.addEventListener('appinstalled', () => { deferred = null; subs.forEach((f) => f()); });
+
+  // ── auto-reload لما يرجع النت بعد انقطاع ──────────────────────────
+  // لو التطبيق اشتغل offline وعنده cached page → لما يرجع النت
+  // بنعمل reload تلقائي بعد ثانية واحدة عشان يجيب أحدث داتا من السيرفر
+  let wasOffline = !env.navigator.onLine;
+  env.addEventListener('online', () => {
+    if (wasOffline) {
+      wasOffline = false;
+      // ثانية واحدة تأخير عشان الاتصال يستقر الأول
+      env.setTimeout(() => env.location.reload(), 1000);
+    }
+  });
+  env.addEventListener('offline', () => { wasOffline = true; });
+  // ──────────────────────────────────────────────────────────────────
+
   // Service workers need a secure context (HTTPS, or localhost/127.0.0.1 for development).
   const native = env.Capacitor && typeof env.Capacitor.isNativePlatform === 'function' && env.Capacitor.isNativePlatform();
   if (!native && 'serviceWorker' in env.navigator && env.isSecureContext) {

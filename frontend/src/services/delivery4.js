@@ -31,10 +31,10 @@
       '  animation: gopsSpin 0.6s linear infinite;',
       '  vertical-align: middle;',
       '}',
-      '@keyframes gopsSpin { to { transform: rotate(360deg); } }',
-      'html[dir="rtl"] .toast, html[dir="rtl"] .gops-toast {',
-      '  left: auto; right: 50%; transform: translateX(50%);',
-      '}'
+      '@keyframes gopsSpin { to { transform: rotate(360deg); } }'
+      /* d61: قاعدة RTL بتاعت التوست اتشالت — كانت لنظام الرسائل القديم (fixed left:50%)
+       * وعلى النظام الحالي (.toasts container + inset-inline) كانت بتزحلق الرسالة في
+       * الوضع العربي نص عرضها يمين، فالنص يطلع بره الشاشة ويبان الشريط فاضي. */
     ].join('\n');
     document.head.appendChild(style);
   }

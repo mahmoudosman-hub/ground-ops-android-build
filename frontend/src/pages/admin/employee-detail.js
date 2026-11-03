@@ -57,6 +57,14 @@ export async function employeeDetailPage(ctx) {
     if (!m) { mapSec.hidden = true; return; }
     const pts = [], br = a && l.branches.find((b) => b.branch_id === a.branch_id); if (br) { drawBranches(m, [{ name: br.branch_name, latitude: br.latitude, longitude: br.longitude, radius: br.geofence_radius_meters }]); pts.push([br.latitude, br.longitude]); }
     if (hist.ok) hist.ok.items.forEach((p) => { drawPoint(m, { lat: p.latitude, lng: p.longitude, state: p.inside_geofence ? 'INSIDE' : 'OUTSIDE', label: `${fmtTime(p.timestamp)}` }); pts.push([p.latitude, p.longitude]); }); fit(m, pts);
+    // d64: إصلاح «الخريطة رمادية وبلاطة واحدة في الركن» — Leaflet بيحسب مقاس الخريطة لحظة فتحها،
+    // ولو الصفحة لسه بترسم بيفتكر إن مقاسها أصغر من الحقيقة فبيحمّل بلاطات للزاوية بس والباقي رمادي.
+    // العلاج: نجبره يعيد حساب المقاس ويصوّب الكادر بعد الرسم (4 مرات) + مع أي تكبير/تصغير للنافذة
+    // + مراقبة تغير مقاس الصندوق نفسه (ResizeObserver) — من غير أي تغيير في ملف الخريطة المشترك.
+    const remap = () => { try { m.map.invalidateSize(); if (pts.length) fit(m, pts); } catch (e) {} };
+    [60, 350, 1000, 2500].forEach((ms) => setTimeout(remap, ms));
+    globalThis.addEventListener('resize', remap);
+    if (globalThis.ResizeObserver) { const ro = new ResizeObserver(() => requestAnimationFrame(remap)); ro.observe(mapBox); }
   });
   return { el: root };
 }

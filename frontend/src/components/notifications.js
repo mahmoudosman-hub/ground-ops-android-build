@@ -1,8 +1,9 @@
 /** In-app notification bell. Free-stack limit: there is no phone push when the app is closed; notifications appear while the app is open (polled). */
+/** d48: "Mark all as read" هو الزر الأساسي وبيشتغل دايماً + رسالة تأكيد + تظليل فوري + بالضغط على أي إشعار يتقرا لوحده. */
 import { h, mount } from '../core/dom.js';
 import { t } from '../core/i18n.js';
 import { fmtDateTime } from '../core/time.js';
-import { openModal, button, toast, emptyState } from './ui.js';
+import { openModal, button, toast, toastError, emptyState } from './ui.js';
 
 export function createNotificationBell({ api, intervalMs = 60000 }) {
   let items = [], unread = null, timer = null, destroyed = false;
@@ -18,10 +19,34 @@ export function createNotificationBell({ api, intervalMs = 60000 }) {
     } catch (e) { /* offline or signed out: keep the last known state */ }
   }
   function open() {
-    const list = () => (items.length ? h('ul', { class: 'notif-list', id: 'notif-list' }, items.map((n) => h('li', { class: n.read ? 'read' : 'unread' }, h('strong', {}, (n.read ? '' : '● ') + n.title), h('p', {}, n.body), h('small', {}, fmtDateTime(n.created_at))))) : emptyState(t('No notifications.')));
+    const list = () => (items.length ? h('ul', { class: 'notif-list', id: 'notif-list' }, items.map((n) => h('li', {
+      class: n.read ? 'read' : 'unread',
+      title: n.read ? '' : t('Tap to mark as read'),
+      on: n.read ? {} : { click: () => markOne(n) }
+    }, h('strong', {}, (n.read ? '' : '● ') + n.title), h('p', {}, n.body), h('small', {}, fmtDateTime(n.created_at))))) : emptyState(t('No notifications.')));
+    async function markAll() {
+      const b = document.getElementById('btn-mark-read');
+      if (b) b.disabled = true;
+      try {
+        await api.call('markNotificationsRead', { all: true });
+        items = items.map((n) => Object.assign({}, n, { read: true }));
+        unread = 0; paint();
+        m.setBody(list());
+        toast(t('All notifications marked as read'), 'ok');
+      } catch (e) { toastError(e); }
+      finally { if (b) b.disabled = false; }
+    }
+    async function markOne(n) {
+      try {
+        await api.call('markNotificationsRead', { notification_ids: [n.notification_id] });
+        n.read = true;
+        unread = Math.max(0, (unread || 1) - 1); paint();
+        m.setBody(list());
+      } catch (e) { toastError(e); }
+    }
     const m = openModal({ title: t('Notifications'), body: list(), actions: [
-      button(t('Mark all as read'), { id: 'btn-mark-read', on: { click: async () => { try { await api.call('markNotificationsRead', { all: true }); await refresh(); m.setBody(list()); } catch (e) { /* ignore */ } } } }),
-      button(t('Close'), { kind: 'primary', on: { click: () => m.close() } })] });
+      button(t('Mark all as read'), { id: 'btn-mark-read', kind: 'primary', on: { click: markAll } }),
+      button(t('Close'), { on: { click: () => m.close() } })] });
   }
   timer = setInterval(() => { if (!globalThis.document || globalThis.document.visibilityState !== 'hidden') refresh(); }, intervalMs);
   refresh(); paint();

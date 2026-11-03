@@ -18,7 +18,20 @@ export function setLang(code) {
 }
 export function initLang() {
   let want = cfg().DEFAULT_LOCALE;
-  try { want = new URLSearchParams(globalThis.location.search).get('lang') || globalThis.localStorage.getItem('gops.lang') || want; } catch (e) { /* ignore */ }
+  try {
+    const store = globalThis.localStorage;
+    const urlLang = new URLSearchParams(globalThis.location.search).get('lang');
+    const saved = store.getItem('gops.lang');
+    // اختيار صريح = من زرار اللغة أو من ?lang= — ده بيتحترم دايماً
+    const userChose = store.getItem('gops.lang.user') === '1' || !!urlLang;
+    const migrated = store.getItem('gops.lang.mig') === 'd47';
+    if (saved || urlLang) {
+      if (userChose || migrated) want = urlLang || saved || want;
+      // أول تحميل بعد تحديث d47: اللي كان لغته إنجليزي من غير اختيار صريح بيتحول للعربي تلقائياً (مرة واحدة)
+      else want = cfg().DEFAULT_LOCALE;
+    }
+    if (!migrated) store.setItem('gops.lang.mig', 'd47');
+  } catch (e) { /* storage unavailable */ }
   return setLang(want);
 }
 export function t(text, vars) {

@@ -381,14 +381,10 @@
   }
 
   function installAdminEntryPoint() {
-    if (document.getElementById('gops-sc-fab')) return;
-    var fab = document.createElement('button');
-    fab.id = 'gops-sc-fab';
-    fab.textContent = '📸 Selfie Checks';
-    fab.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:99991;padding:12px 16px;border:0;border-radius:24px;background:#0a84ff;color:#fff;font:600 14px system-ui,sans-serif;box-shadow:0 4px 16px rgba(10,132,255,.45);cursor:pointer;';
-    fab.onclick = openAdminSelfiePage;
-    document.body.appendChild(fab);
-
+    // d61: الزرار العائم 📸 اتشال — كان بيغطي آخر صف في الجدول، ولينك «فحوصات السيلفي»
+    // موجود في القائمة الجانبية أصلاً (بيتحط تحت).
+    var oldFab = document.getElementById('gops-sc-fab');
+    if (oldFab) oldFab.remove();
     try {
       var nav = document.querySelector('.sidebar, nav.sidebar, aside.sidebar, .nav, aside nav, .menu, #sidebar');
       if (nav && !nav.querySelector('[data-gops-sc-link]')) {

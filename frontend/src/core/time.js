@@ -1,4 +1,5 @@
 import { cfg } from './config.js';
+import { getLang } from './i18n.js';
 const tz = () => cfg().DEFAULT_TIMEZONE;
 const pick = (opts) => new Intl.DateTimeFormat('en-GB', { timeZone: tz(), hourCycle: 'h23', ...opts });
 export function fmtTime(iso) { return iso ? pick({ hour: '2-digit', minute: '2-digit' }).format(new Date(iso)) : '-'; }
@@ -9,5 +10,25 @@ export function fmtDate(v) { // 'YYYY-MM-DD' (already a Cairo date) or ISO insta
 }
 export function todayLocal(now = Date.now()) { return fmtDate(new Date(now).toISOString()); }
 export function addDays(dateStr, n) { const d = dateStr.split('-').map(Number); return new Date(Date.UTC(d[0], d[1] - 1, d[2] + n)).toISOString().slice(0, 10); }
-export function minutesText(m) { if (m === null || m === undefined) return '-'; if (m < 60) return `${m} min`; return `${Math.floor(m / 60)} h ${m % 60} min`; }
-export function agoText(iso, now = Date.now()) { if (!iso) return '-'; const m = Math.max(0, Math.round((now - Date.parse(iso)) / 60000)); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} h ${m % 60} min ago`; }
+export function minutesText(m) {
+  if (m === null || m === undefined) return '-';
+  if (getLang() === 'ar') {
+    if (m < 60) return m === 1 ? 'دقيقة' : `${m} دقيقة`;
+    const h = Math.floor(m / 60), mm = m % 60;
+    const hs = h === 1 ? 'ساعة' : h === 2 ? 'ساعتين' : `${h} ساعات`;
+    return mm ? `${hs} و${mm} دقيقة` : hs;
+  }
+  if (m < 60) return `${m} min`; return `${Math.floor(m / 60)} h ${m % 60} min`;
+}
+export function agoText(iso, now = Date.now()) {
+  if (!iso) return '-';
+  const m = Math.max(0, Math.round((now - Date.parse(iso)) / 60000));
+  if (getLang() === 'ar') {
+    if (m < 1) return 'الآن';
+    if (m < 60) return m === 1 ? 'من دقيقة' : `من ${m} دقايق`;
+    const h = Math.floor(m / 60), mm = m % 60;
+    const hs = h === 1 ? 'ساعة' : h === 2 ? 'ساعتين' : `${h} ساعات`;
+    return mm ? `من ${hs} و${mm} دقايق` : `من ${hs}`;
+  }
+  return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.floor(m / 60)} h ${m % 60} min ago`;
+}

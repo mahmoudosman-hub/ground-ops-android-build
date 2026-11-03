@@ -35,6 +35,7 @@ const AR = {
   'Pings: the system automatically pings captains whose location is stale (every 15 minutes). "Pings without reply" shows who did not respond, and "Ping now" sends a ping yourself.': 'النبضات: النظام بينادي تلقائياً على أي كابتن موقعه بقى قديم (كل 15 دقيقة)، وعمود «نبضات بدون رد» بيوضح مين ما ردش، وزرار «نبضة فورية» تبعت بيها نداء بنفسك.',
   'End the break of {n}? Location tracking resumes for them.': 'هتقفل بريك {n}؟ التتبع هيرجع يشتغل عنده تاني.',
   'Break ended': 'اتقفل البريك ✅',
+  'End break': 'قفل البريك',
   'End the shift of {n}? Their open break ends too, and they can check in again right after.': 'هتقفل شيفت {n} دلوقتي؟ أي بريك مفتوح هيقفل معاه، والكابتن يقدر يفتح شيفت جديد بعدها على طول.',
   'End shift': 'قفل الشيفت',
   'Shift ended': 'اتقفل الشيفت ✅',
@@ -61,6 +62,8 @@ const AR = {
   // ---------- خرائط جوجل ----------
   'Google Maps': 'خرائط جوجل', 'Watch': 'متابعة', 'Watching': 'بيتم المتابعة',
   'Removed from Google Maps watchlist': 'اتشالت من قائمة متابعة خرائط جوجل', 'Marked as sharing on Google Maps': 'اتسجل على قائمة متابعة خرائط جوجل',
+  'Watch Live': 'متابعة لايف',
+  '🗺️ iPhone captains: if a captain shared their Google Maps link, the Watch button turns green and opens their live location directly.': '🗺️ كباتن الآيفون: لو كابتن شارك رابط خرائط جوجل بتاعه، زرار المتابعة بيتحول لأخضر وبيفتح موقعه لايف على طول.',
 
   // ---------- الإشعارات (d48) ----------
   'Notifications': 'الإشعارات', 'Notifications ({n} unread)': 'الإشعارات ({n} غير مقروء)',
@@ -85,8 +88,47 @@ const AR = {
   'Pick two different captains.': 'اختار كابتنين مختلفين.',
   'Swap the shifts of {a} and {b} on {d}? Each one gets a notification with the new branch.': 'هتبدل شيفت {a} و {b} يوم {d}؟ كل واحد فيهم هيوصله إشعار بالفرع الجديد.',
   'Swapped ✅ {a} → {ab} and {b} → {bb}. Push delivered to {n} device(s).': 'اتبدل ✅ {a} ← فرع {ab} ، و {b} ← فرع {bb}. الإشعار وصل لـ {n} جهاز.',
+  'Swapping... please wait': 'جاري التبديل... استنى لحظة', // d58
+  'A new version is available.': 'فيه نسخة جديدة من البرنامج جاهزة.', 'Reload': 'حدّث', // d58
   'No active assignment on that date for {n}.': '{n} مالوش شيفت مسجلة في اليوم ده.',
-  'No registered device for: {n}': 'مفيش جهاز مسجل بإشعارات لـ: {n}'
+  'No registered device for: {n}': 'مفيش جهاز مسجل بإشعارات لـ: {n}',
+  // d66: رسايل التايمآوت في صفحة استيراد الجدول
+  'The server is taking longer than expected. The changes were most likely applied successfully.': 'السيرفر بياخد وقت أطول من المتوقع. التغييرات غالبًا اتنفذت بنجاح.',
+  'Reload the page to confirm.': 'حدّث الصفحة للتأكيد.',
+  'Taking longer than expected — reload to confirm': 'بياخد وقت أطول من المتوقع — حدّث الصفحة للتأكيد',
+  // d66: ميزة زرار «✅ شغال» (d56) في المراقبة المباشرة
+  'Active': 'شغال',
+  'Confirm that {n} is active? This will reset their "off the grid" timer for 15 minutes.': 'تأكيد إن {n} شغال؟ ده هيصفّر مؤقت «خارج الشبكة» بتاعه لمدة ١٥ دقيقة.',
+  '✅ Yes, they are active': '✅ أيوه، شغال',
+  'Updated — {n} is now shown as active for 15 minutes': 'تم — {n} هيظهر شغال لمدة ١٥ دقيقة',
+  'I confirmed this captain is active via Google Maps. Reset their off-grid timer.': 'أنا متأكد إن الكابتن ده شغال من خرائط جوجل. ده هيصفّر مؤقت «خارج الشبكة» بتاعه.',
+  '🗺️ iPhone captains: Watch Live opens their Google Maps location. ✅ Active confirms they are working and resets their off-grid timer for 15 minutes.': '🗺️ كباتن الآيفون: «متابعة لايف» بتفتح موقعهم على خرائط جوجل. و«✅ شغال» بتأكد إن الكابتن بيشتغل وبتصفّر مؤقت «خارج الشبكة» ١٥ دقيقة.',
+
+  // ---------- S22: التقارير الجديدة + كارت KPI في الإعدادات ----------
+  'Captain Daily Summary': 'ملخص الكابتن اليومي', 'KPI Scores': 'درجات الـ KPI',
+  'Run report': 'اعرض التقرير', 'Exported {n} rows': 'تم تصدير {n} سجل',
+  'No records match these filters.': 'مفيش سجلات مطابقة للفلاتر دي.',
+  'Employee is required for "Employee Attendance History". Tracking gaps are limited to 31 days.': 'لازم تختار كابتن عشان تقرير «سجل حضور الكابتن». فجوات التتبع بتتعرض بحد أقصى 31 يوم.',
+  'KPI Configuration': 'إعدادات مؤشرات الأداء (KPI)',
+  'Choose which metrics count toward the KPI score, their weight (%), the allowed threshold before deductions start, and the deduction per unit above the threshold.': 'اختار المعايير اللي بتحسب في درجة الـ KPI، ووزن كل معيار (%)، والحد المسموح قبل ما الخصم يبدأ، وقيمة الخصم لكل وحدة زيادة عن الحد.',
+  'Metric': 'المعيار', 'Weight': 'الوزن', 'Threshold (allowed)': 'الحد المسموح', 'Deduction per unit': 'الخصم لكل وحدة',
+  'Save KPI settings': 'حفظ إعدادات الـ KPI', 'KPI settings saved': 'إعدادات الـ KPI اتحفظت ✅',
+  'min': 'دقيقة', 'times': 'مرات', 'time': 'مرة',
+  'No changes': 'مفيش تغييرات', 'Settings saved': 'الإعدادات اتحفظت ✅',
+  'Location log archive': 'أرشيف سجل المواقع', 'Archive now': 'أرشفة دلوقتي',
+  'Archive status unavailable.': 'حالة الأرشيف مش متاحة.',
+  'Archived {n} rows': 'اتأرشف {n} سجل',
+  'Move location logs older than {d} days into monthly archive sheets? Reports keep working.': 'هتنقل سجلات المواقع الأقدم من {d} يوم لأوراق أرشيف شهرية؟ التقارير هتفضل شغالة زي ما هي.',
+  'Nothing is deleted by archiving. Deleting old archives happens only if "archive retention months" above is set above 0.': 'مفيش حاجة بتتحذف بالأرشفة. حذف الأرشيف القديم بيحصل بس لو قيمة «archive retention months» اللي فوق معمولة أكبر من 0.',
+  '{a} rows in Location_Logs, {b} rows in {c} monthly archive sheet(s): {n}': '{a} سجل في Location_Logs، {b} سجل في {c} ورقة أرشيف شهرية: {n}',
+
+  // ---------- d70: فجوات ترجمة قديمة في تطبيق الكابتن (بانر التثبيت + شاشة تغيير كلمة المرور) ----------
+  'For security you must change your temporary password before continuing.': 'لأمان حسابك لازم تغيّر كلمة المرور المؤقتة قبل ما تكمل.',
+  'Install app': 'ثبّت التطبيق',
+  'Install this app on your phone for quick access.': 'ثبّت التطبيق على موبايلك للوصول السريع.',
+  'Sections': 'الأقسام',
+  'To install on iPhone: tap the Share button in Safari, then "Add to Home Screen".': 'للتثبيت على الآيفون: دوس زرار المشاركة في Safari وبعدين اختار "Add to Home Screen".',
+  'Your Employee ID and password are provided by your administrator.': 'رقم الموظف وكلمة المرور بيوفّرهم لك المدير المسؤول.'
 };
 
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً

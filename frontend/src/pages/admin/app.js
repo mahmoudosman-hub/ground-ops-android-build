@@ -1,6 +1,6 @@
 import { h, mount } from '../../core/dom.js';
 import { cfg } from '../../core/config.js';
-import { t, initLang } from '../../core/i18n.js';
+import { t, initLang, getLang, setLang } from '../../core/i18n.js';
 import { createApi } from '../../core/api.js';
 import { errorMessage } from '../../core/errors.js';
 import { buildForm, badge, button, toast } from '../../components/ui.js';
@@ -17,9 +17,18 @@ import { reportsPage } from './reports.js';
 import { settingsPage } from './settings.js';
 import { adminsPage } from './admins.js';
 import { createNotificationBell } from '../../components/notifications.js';
+import { initTheme } from '../../services/theme.js'; // d70: زرار الوضع الليلي 🌙/☀️
 import { alertsPage } from './alerts.js';
 import { scheduleImportPage } from './schedule-import.js';
 import { requestsPage } from './requests.js';
+
+/* d58: شريط «فيه نسخة جديدة» على الداشبورد — كان موجود في تطبيق الكابتن بس،
+ * فالأدمن كان بيفضل على النسخة القديمة من غير ما يدري (وده اللي خلى إصلاح
+ * نافذة التأكيد «يوصل متوصلش» أكتر من مرة). أي تحديث جديد هيظهر زرار حدّث فوق. */
+globalThis.addEventListener('gops-update-ready', (e) => {
+  const box = globalThis.document.getElementById('update-bar');
+  if (box) mount(box, h('div', { class: 'alert alert-info' }, t('A new version is available.'), ' ', button(t('Reload'), { small: true, on: { click: () => { const w = e.detail && e.detail.waiting; if (w) w.postMessage('SKIP_WAITING'); globalThis.location.reload(); } } })));
+});
 
 export const ROUTES = [
   { path: 'dashboard', title: 'Dashboard', perm: 'view_current_status', page: dashboardPage, nav: true }, { path: 'live', title: 'Live Monitoring', perm: 'view_current_status', page: livePage, nav: true },
@@ -44,8 +53,12 @@ export function mountAdminApp(root, deps = {}) {
   const api = deps.api || createApi('admin'), lookups = createLookups(api);
   let current = null, notice = null, bell = null;
   const content = h('main', { id: 'main', class: 'content', tabindex: '-1' }), nav = h('nav', { class: 'sidebar', id: 'sidebar', 'aria-label': t('Main navigation') }), who = h('span', { class: 'who' }), bellBox = h('span', { id: 'bell-box' });
+  const APP_VER = 'd70'; // d70: Talabat Orange (#FF6B00) + Dark Mode — زرار 🌙/☀️ في الهيدر (localStorage + Auto Dark) و app.css بالكامل بنظام ألوان جديد // d69: Reports + Settings S22 — تقريرين جداد (Captain Daily Summary + KPI Scores) وكارت KPI Configuration في الإعدادات // d68: ترجمة زرار «End break» → «قفل البريك» في المراقبة المباشرة (كانت ظاهرة بالإنجليزي)
+  // زرار اللغة: يقلب الواجهة كلها عربي/إنجليزي ويحفظ الاختيار (d47)
+  const langBtn = button(getLang() === 'ar' ? 'EN' : 'عربي', { small: true, id: 'btn-lang', aria: 'Language / اللغة', on: { click: () => { const next = getLang() === 'ar' ? 'en' : 'ar'; setLang(next); try { localStorage.setItem('gops.admin.lang', next); localStorage.setItem('gops.lang.user', '1'); } catch (e) { /* ignore */ } globalThis.location.reload(); } } });
   const menuBtn = h('button', { class: 'icon-btn menu-btn', type: 'button', id: 'btn-menu', 'aria-label': t('Menu'), 'aria-expanded': 'false', on: { click: () => { const open = nav.classList.toggle('open'); menuBtn.setAttribute('aria-expanded', String(open)); } } }, '☰');
-  const shell = h('div', { class: 'admin-shell' }, h('header', { class: 'app-header' }, menuBtn, h('div', { class: 'brand' }, h('img', { src: './assets/icons/icon-192.png', alt: '', width: 28, height: 28 }), h('span', {}, cfg().APP_NAME + ' - ' + t('Admin'))), bellBox, who,
+  const themeBtn = initTheme(); // d70: زرار الوضع الليلي في الهيدر (بيتحفظ في localStorage)
+  const shell = h('div', { class: 'admin-shell' }, h('header', { class: 'app-header' }, menuBtn, h('div', { class: 'brand' }, h('img', { src: './assets/icons/icon-192.png', alt: '', width: 28, height: 28 }), h('span', {}, cfg().APP_NAME + ' - ' + t('Admin')), h('span', { class: 'ver', id: 'app-ver', title: 'App version' }, APP_VER)), bellBox, langBtn, themeBtn, who,
     button(t('Sign out'), { small: true, id: 'btn-logout', on: { click: async () => { cleanup(); await api.logout(); notice = null; boot(); } } })), nav, content);
   api.onSessionEnd((code) => { notice = errorMessage({ code }); cleanup(); boot(); });
 
