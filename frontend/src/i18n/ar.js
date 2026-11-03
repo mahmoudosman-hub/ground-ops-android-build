@@ -136,7 +136,20 @@ const AR = {
   'Good': 'جيد',
   'Needs improvement': 'محتاج تحسين',
   '{n} days this month': '{n} يوم في الشهر ده',
-  'No KPI data yet this month.': 'مفيش بيانات KPI للشهر ده لسه.'
+  'No KPI data yet this month.': 'مفيش بيانات KPI للشهر ده لسه.',
+
+  // ---------- d73: تاب «📊 إحصائياتي» (delivery32) — KPI + إحصائيات الشهر ----------
+  'My Stats': 'إحصائياتي',
+  'Attendance days': 'أيام الحضور',
+  'Late arrivals': 'مرات التأخير',
+  'Break minutes': 'دقائق البريك',
+  'Leave balance': 'رصيد الإجازات',
+  'days': 'يوم',
+  'Stats — {m}': 'الإحصائيات — {m}',
+  'No data available right now.': 'مفيش بيانات متاحة دلوقتي.',
+  'Not signed in': 'مش مسجل دخول',
+  'Something went wrong': 'حدث خطأ',
+  'Try again': 'حاول تاني'
 };
 
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً

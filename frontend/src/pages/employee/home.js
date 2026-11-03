@@ -8,32 +8,27 @@ import { cfg } from '../../core/config.js';
 import { openCheckIn, openCheckOut } from './checkin.js';
 import { breakCard } from './breaks.js';
 import { openTrackingHelp } from './native-help.js';
+// d73: كارت KPI اتنقل من هنا لتاب «📊 إحصائياتي» الكامل (src/services/delivery32.js)
 
 const CACHE = (id) => `gops.schedule.${id}`;
 const isOnline = () => !(globalThis.navigator && globalThis.navigator.onLine === false);
 
 export function createHome({ api, provider, queue }) {
   const user = api.session().user, userId = user.employee_id;
-  let schedule = null, fromCache = false, loadError = null, trk = { trackingState: 'STOPPED', pending: 0 }, gps = null, kpi = null, destroyed = false, awake = false;
+  let schedule = null, fromCache = false, loadError = null, trk = { trackingState: 'STOPPED', pending: 0 }, gps = null, destroyed = false, awake = false;
   const el = h('div', { class: 'home' });
   const tracker = createTracker({ api, provider, queue, userId, getSettings: () => (schedule && schedule.settings) || {}, getShift: () => (schedule && schedule.assignment) || null, intervalOverrideMs: cfg().TRACKING_INTERVAL_OVERRIDE_MS, onChange: (s) => { trk = s; if (s.ended) refresh(); render(); } });
 
   const seenHelp = () => { try { return !!globalThis.localStorage.getItem('gops.nativeHelp.' + userId); } catch (e) { return true; } };
   const markHelp = () => { try { globalThis.localStorage.setItem('gops.nativeHelp.' + userId, '1'); } catch (e) { /* ignore */ } };
   function readCache() { try { return JSON.parse(globalThis.localStorage.getItem(CACHE(userId))); } catch (e) { return null; } }
-  const currentMonth = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
   async function refresh() {
     try { schedule = await api.call('getTodaySchedule', {}); fromCache = false; loadError = null; try { globalThis.localStorage.setItem(CACHE(userId), JSON.stringify({ at: Date.now(), data: schedule })); } catch (e) { /* ignore */ } }
     catch (e) {
       if (['OFFLINE', 'NETWORK_ERROR', 'SERVER_UNAVAILABLE'].includes(e.code)) { const c = readCache(); if (c) { schedule = c.data; fromCache = c.at; loadError = null; } else loadError = e; } else loadError = e;
     }
-    syncTracker(); render(); loadKpi();
+    syncTracker(); render();
     if (provider.capabilities.batterySettings && schedule && schedule.attendance && schedule.attendance.state === 'NOT_CHECKED_IN' && !seenHelp()) { markHelp(); openTrackingHelp({ provider }); }
-  }
-  // d72: KPI الشخصي — جلب موازي خفيف بعد الجدول؛ فشله مبيكسرش الصفحة (لو الباك إند لسه مفيهوش getMyKpi الكارت بيفضل مخفي)
-  function loadKpi() {
-    if (!isOnline()) return;
-    api.call('getMyKpi', { month: currentMonth() }).then((res) => { kpi = res || null; render(); }).catch(() => { /* KPI اختياري */ });
   }
   function syncTracker() {
     if (!schedule) return;
@@ -50,27 +45,6 @@ export function createHome({ api, provider, queue }) {
   }
 
   /* ---- sections ---- */
-  /* ---- d72: كارت «مؤشرات أدائي» (بدل جدول آخر ٧ أيام) ---- */
-  function kpiCard() {
-    if (!kpi) return null;
-    const score = kpi.kpi_score != null ? kpi.kpi_score : null;
-    const scoreColor = score == null ? 'var(--muted)' : score >= 90 ? 'var(--ok)' : score >= 70 ? 'var(--warn)' : 'var(--bad)';
-    const scoreLabel = score == null ? '' : score >= 90 ? t('Excellent') : score >= 70 ? t('Good') : t('Needs improvement');
-    const metrics = Array.isArray(kpi.metrics) ? kpi.metrics : [];
-    return h('section', { class: 'card kpi-card', id: 'kpi-card' },
-      h('h2', {}, t('My KPI') + ' — ' + (kpi.month_label || currentMonth())),
-      score != null ? h('div', { style: 'display:flex;align-items:center;gap:14px;margin:10px 0 14px' },
-        h('span', { style: 'font-size:2.4rem;font-weight:700;color:' + scoreColor }, score + '%'),
-        h('div', {},
-          h('p', { style: 'margin:0;font-weight:600;color:' + scoreColor }, scoreLabel),
-          h('p', { style: 'margin:0;font-size:.82rem;color:var(--muted)' }, t('{n} days this month', { n: kpi.days_in_period || 0 }))))
-        : h('p', { class: 'hint' }, t('No KPI data yet this month.')),
-      metrics.length ? h('div', { id: 'kpi-metrics' },
-        ...metrics.map((m) => h('div', { class: 'kpi-row' },
-          h('span', { class: 'kpi-label' }, m.label),
-          h('span', { class: 'kpi-val', style: (m.value || 0) > 0 ? 'color:var(--bad)' : 'color:var(--ok)' },
-            (m.value || 0) > 0 ? (m.value + ' ' + (m.unit || '')) : '✓')))) : null);
-  }
   function shiftCard() {
     if (!schedule) return null;
     const a = schedule.assignment, sh = a && a.shift;
@@ -138,7 +112,7 @@ export function createHome({ api, provider, queue }) {
       fromCache ? h('div', { class: 'alert alert-warn', id: 'cache-note' }, t('Showing your last saved schedule ({t}). Connect to refresh.', { t: fmtDateTime(new Date(fromCache).toISOString()) })) : null,
       loadError ? errorBox(loadError) : null, !schedule && !loadError ? spinner() : null,
       schedule ? h('div', { class: 'greeting' }, h('h1', {}, schedule.employee.name), h('p', { class: 'hint' }, t('Employee ID {id}', { id: schedule.employee.employee_id }))) : null,
-      shiftCard(), actions(), breakNode(), gpsCard(), trackingCard(), kpiCard());
+      shiftCard(), actions(), breakNode(), gpsCard(), trackingCard());
   }
   const onVis = () => { if (globalThis.document.visibilityState === 'visible') refresh(); };
   const onOnline = () => { tracker.onOnline(); refresh(); };
