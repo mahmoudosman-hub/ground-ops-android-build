@@ -117,11 +117,20 @@ export async function settingsPage(ctx) {
             )
           ),
 
+          // شرح مبسط للكارت
+          h('div', { style: 'background:var(--mute-bg);border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:.8rem;color:var(--muted);line-height:1.5' },
+            h('span', {}, '⚖️ '), h('strong', {}, t('Weight')), h('span', {}, ': ' + t('Importance of this metric in the overall KPI score') + '  '),
+            h('br'),
+            h('span', {}, '✅ '), h('strong', {}, t('Allowed')), h('span', {}, ': ' + t('Number of allowed {u} before deductions start', { u: unitLabel }) + '  '),
+            h('br'),
+            h('span', {}, '📉 '), h('strong', {}, t('Deduct')), h('span', {}, ': ' + t('Percentage deducted from the KPI score per {u} over the allowed limit', { u: unitLabel }))
+          ),
+
           // Fields: وزن + حد + خصم في صف واحد
           h('div', { style: 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px' },
             // الوزن
             h('div', {},
-              h('label', { style: 'display:block;font-size:.75rem;color:var(--muted);margin-bottom:4px;font-weight:600' }, t('Weight')),
+              h('label', { style: 'display:block;font-size:.75rem;color:var(--muted);margin-bottom:4px;font-weight:600', title: t('Importance of this metric in the overall KPI score') }, '⚖️ ' + t('Weight')),
               h('div', { style: 'display:flex;align-items:center;gap:4px' },
                 h('input', { type: 'number', id: `kpi-w-${m.key}`, value: mcfg.weight || 20, min: 1, max: 100, style: 'width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;background:var(--bg);color:var(--text)' }),
                 h('span', { style: 'font-size:.75rem;color:var(--muted);white-space:nowrap' }, '%')
@@ -129,7 +138,7 @@ export async function settingsPage(ctx) {
             ),
             // الحد المسموح
             h('div', {},
-              h('label', { style: 'display:block;font-size:.75rem;color:var(--muted);margin-bottom:4px;font-weight:600' }, t('Allowed')),
+              h('label', { style: 'display:block;font-size:.75rem;color:var(--muted);margin-bottom:4px;font-weight:600', title: t('The accepted amount before any deduction') }, '✅ ' + t('Allowed')),
               h('div', { style: 'display:flex;align-items:center;gap:4px' },
                 h('input', { type: 'number', id: `kpi-t-${m.key}`, value: mcfg.threshold || 1, min: 0, max: 999, style: 'width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;background:var(--bg);color:var(--text)' }),
                 h('span', { style: 'font-size:.75rem;color:var(--muted);white-space:nowrap' }, unitLabel)
@@ -137,7 +146,7 @@ export async function settingsPage(ctx) {
             ),
             // الخصم
             h('div', {},
-              h('label', { style: 'display:block;font-size:.75rem;color:var(--muted);margin-bottom:4px;font-weight:600' }, t('Deduct')),
+              h('label', { style: 'display:block;font-size:.75rem;color:var(--muted);margin-bottom:4px;font-weight:600', title: t('Deduction percentage per unit over the allowed limit') }, '📉 ' + t('Deduct')),
               h('div', { style: 'display:flex;align-items:center;gap:4px' },
                 h('input', { type: 'number', id: `kpi-p-${m.key}`, value: mcfg.penalty || 5, min: 1, max: 50, style: 'width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;background:var(--bg);color:var(--text)' }),
                 h('span', { style: 'font-size:.75rem;color:var(--muted);white-space:nowrap' }, '%')
@@ -175,7 +184,12 @@ export async function settingsPage(ctx) {
 
       kpiCard.replaceChildren(
         h('h2', {}, '📊 ' + t('KPI Configuration')),
-        h('p', { class: 'hint' }, t('Enable the metrics you want, set their weight (%), the allowed amount before deductions start, and the deduction percentage per unit over the threshold.')),
+        h('p', { class: 'hint' }, t('Enable the metrics you want, and set for each:')),
+        h('ul', { class: 'hint', style: 'margin:4px 0 12px;padding-inline-start:20px;line-height:1.8' },
+          h('li', {}, h('strong', {}, '⚖️ ' + t('Weight')), t(' — how important this metric is compared to the others (e.g. Late 30% vs Absent 20% means Late matters more)')),
+          h('li', {}, h('strong', {}, '✅ ' + t('Allowed')), t(' — the normal accepted amount before we start deducting (e.g. one late arrival per month is fine)')),
+          h('li', {}, h('strong', {}, '📉 ' + t('Deduct')), t(' — percentage deducted from the KPI score per unit over the limit (e.g. each extra late arrival = -5%)'))
+        ),
         h('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin:14px 0' }, ...cards),
         h('div', { style: 'margin-top:4px' }, saveBtn)
       );
