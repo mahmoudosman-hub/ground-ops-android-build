@@ -576,7 +576,10 @@ const AR = {
   'Online': 'متصل', 'minutes': 'دقائق', 'No notifications': 'لا توجد إشعارات',
   'Absence': 'الغياب', 'Early leave': 'الانصراف المبكر', 'Forgot checkout': 'نسيان تسجيل الانصراف',
   'Break overtime (minutes)': 'تجاوز وقت البريك (دقائق)', 'Branch exits': 'عدد مرات الخروج من الفروع',
-  'GPS stale (minutes)': 'GPS دقائق بدون تحديث'
+  'GPS stale (minutes)': 'GPS دقائق بدون تحديث',
+
+  // ---------- d83: tooltip إصدار التطبيق ----------
+  'App version': 'إصدار التطبيق'
 };
 
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً

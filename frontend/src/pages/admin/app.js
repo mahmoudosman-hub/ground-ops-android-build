@@ -17,7 +17,7 @@ import { reportsPage } from './reports.js';
 import { settingsPage } from './settings.js';
 import { adminsPage } from './admins.js';
 import { createNotificationBell } from '../../components/notifications.js';
-import { initTheme } from '../../services/theme.js'; // d70: زرار الوضع الليلي 🌙/☀️
+import { initTheme } from '../../services/theme.js';
 import { alertsPage } from './alerts.js';
 import { scheduleImportPage } from './schedule-import.js';
 import { requestsPage } from './requests.js';
@@ -52,11 +52,29 @@ export function mountAdminApp(root, deps = {}) {
   initLang();
   const api = deps.api || createApi('admin'), lookups = createLookups(api);
   let current = null, notice = null, bell = null;
+
+  // ── Page Cache — بيحفظ الصفحات المحملة عشان التنقل يبقى فوري ──
+  const pageCache = new Map(); // path → { page, loadedAt }
+  const CACHE_TTL = 5 * 60 * 1000; // 5 دقائق
+  // employee مستثنى كمان: بيتغير مع الـ params (id الموظف) ومفيهوش refresh —
+  // لو اتخزن، فتح موظف تاني خلال الـ 5 دقايق كان هيعرض بيانات الموظف القديم
+  const NO_CACHE = ['live', 'requests', 'dashboard', 'employee']; // صفحات دايماً تتحدث
+
+  function getCached(path) {
+    const c = pageCache.get(path);
+    if (!c) return null;
+    if (Date.now() - c.loadedAt > CACHE_TTL) { pageCache.delete(path); return null; }
+    return c;
+  }
+  function setCache(path, page) {
+    if (!NO_CACHE.includes(path)) pageCache.set(path, { page, loadedAt: Date.now() });
+  }
+  function clearCache() { pageCache.forEach((c) => { if (c.page && c.page.destroy) try { c.page.destroy(); } catch (e) { /* ignore */ } }); pageCache.clear(); }
+  // ──────────────────────────────────────────────────────────────────
+
   const content = h('main', { id: 'main', class: 'content', tabindex: '-1' }), nav = h('nav', { class: 'sidebar', id: 'sidebar', 'aria-label': t('Main navigation') }), who = h('span', { class: 'who' }), bellBox = h('span', { id: 'bell-box' });
-  const APP_VER = 'd82'; // d82: كارت «⏰ إذن التأخير» في الإعدادات — تحديد الحد الأدنى للدقايق قبل الشيفت لتقديم طلب إذن التأخير (getLatePermissionMinutes/updateLatePermissionMinutes — محتاج إضافة الأكشنين في Apps Script) + ترجمات d82 // d81: شرح مبسط لقسم KPI — قايمة ⚖️ الوزن/✅ المسموح/📉 الخصم بأمثلة فوق الكروت + بوكس شرح جوا كل كارت مع tooltips — كله ملفوف t() (9 مفاتيح ترجمة جديدة) // d80: إعادة تصميم قسم KPI في الإعدادات — كروت grid بدل الجدول (أيقونة + لون مميز لكل معيار + toggle بيلوّن الكارت + 3 أرقام: الوزن/المسموح/الخصم) + مفاتيح ترجمة ناقصة (Allowed/Deduct/Save settings/Settings + وصف الكروت) // d79: إصلاح تسريبات لغوية ابليكشن الكابتن — تابات Home/My schedule/Requests + شارة Online + أسماء أيام الجدول بلغة التطبيق + labels/units الـ KPI من السيرفر بتترجم (delivery32) + بقايا أدمن (delivery26/34/35/21) // d78: إصلاح انفتاخ الهيدر لما السايدبار يتخفي أو المحتوى قصير — grid-template-rows: auto 1fr على .admin-shell (align-content:stretch كان يوزع المساحة الفاضية على صف الهيدر) // d77: تحكم إظهار/إخفاء السايدبار — زرار ✕ جوه السايدبار + ☰ شغال على كل المقاسات (ديسكتوب يخفي/يظهر العمود مع حفظ الحالة) // d76: إصلاح اختفاء أزرار السايدبار السفلية في الوضع اللايت (Language/Hints/Week Grid/Selfie/Auto Scheduler/إشعار) — color: var(--sidebar-text) على .sidebar // d75: توحيد اللغات — 324 مفتاح ترجمة جديد في ar.js + تغليف كل النصوص الهاردكود بـ t() (delivery9/18/30/31/36 + ping-response + pray26 + كارت الآيفون) // d74: تحديث app.css — Dark Mode أفتح وأوضح (#221010/#2E1618 + muted #B09080) + سايدبار أغمق (#2C0E10) مع الحفاظ على بلوك الـ compat (.big/.sr-only/.btn-danger/.ver) // d73: تاب «📊 إحصائياتي» في شريط تابات الكابتن (delivery32.js) — KPI + إحصائيات الشهر كصفحة كاملة بدل الكارت في الهوم // d72: كارت «مؤشرات أدائي» (getMyKpi) في هوم الكابتن + زرار تبديل اللغة عربي/English في هيدر الكابتن
-  // زرار اللغة: يقلب الواجهة كلها عربي/إنجليزي ويحفظ الاختيار (d47)
+  const APP_VER = 'd83'; // d83: Page Cache للتنقل الفوري — الصفحة بتتحفظ 5 دقايق وبتتعرض فوراً من الـ cache مع تحديث خلفي هادي (live/requests/dashboard/employee دايماً fresh — employee بياخد id الموظف في الـ params ومفيهوش refresh) + tooltip App version اتحط في t() // d82: كارت «⏰ إذن التأخير» في الإعدادات — تحديد الحد الأدنى للدقايق قبل الشيفت لتقديم طلب إذن التأخير (getLatePermissionMinutes/updateLatePermissionMinutes — محتاج إضافة الأكشنين في Apps Script) + ترجمات d82 // d81: شرح مبسط لقسم KPI — قايمة ⚖️ الوزن/✅ المسموح/📉 الخصم بأمثلة فوق الكروت + بوكس شرح جوا كل كارت مع tooltips — كله ملفوف t() (9 مفاتيح ترجمة جديدة) // d80: إعادة تصميم قسم KPI في الإعدادات — كروت grid بدل الجدول (أيقونة + لون مميز لكل معيار + toggle بيلوّن الكارت + 3 أرقام: الوزن/المسموح/الخصم) + مفاتيح ترجمة ناقصة (Allowed/Deduct/Save settings/Settings + وصف الكروت) // d79: إصلاح تسريبات لغوية ابليكشن الكابتن — تابات Home/My schedule/Requests + شارة Online + أسماء أيام الجدول بلغة التطبيق + labels/units الـ KPI من السيرفر بتترجم (delivery32) + بقايا أدمن (delivery26/34/35/21) // d78: إصلاح انفتاخ الهيدر لما السايدبار يتخفي أو المحتوى قصير — grid-template-rows: auto 1fr على .admin-shell (align-content:stretch كان يوزع المساحة الفاضية على صف الهيدر) // d77: تحكم إظهار/إخفاء السايدبار — زرار ✕ جوه السايدبار + ☰ شغال على كل المقاسات (ديسكتوب يخفي/يظهر العمود مع حفظ الحالة) // d76: إصلاح اختفاء أزرار السايدبار السفلية في الوضع اللايت (Language/Hints/Week Grid/Selfie/Auto Scheduler/إشعار) — color: var(--sidebar-text) على .sidebar // d75: توحيد اللغات — 324 مفتاح ترجمة جديد في ar.js + تغليف كل النصوص الهاردكود بـ t() (delivery9/18/30/31/36 + ping-response + pray26 + كارت الآيفون) // d74: تحديث app.css — Dark Mode أفتح وأوضح (#221010/#2E1618 + muted #B09080) + سايدبار أغمق (#2C0E10) مع الحفاظ على بلوك الـ compat (.big/.sr-only/.btn-danger/.ver) // d73: تاب «📊 إحصائياتي» في شريط تابات الكابتن (delivery32.js) — KPI + إحصائيات الشهر كصفحة كاملة بدل الكارت في الهوم // d72: كارت «مؤشرات أدائي» (getMyKpi) في هوم الكابتن + زرار تبديل اللغة عربي/English في هيدر الكابتن
   const langBtn = button(getLang() === 'ar' ? 'EN' : 'عربي', { small: true, id: 'btn-lang', aria: 'Language / اللغة', on: { click: () => { const next = getLang() === 'ar' ? 'en' : 'ar'; setLang(next); try { localStorage.setItem('gops.admin.lang', next); localStorage.setItem('gops.lang.user', '1'); } catch (e) { /* ignore */ } globalThis.location.reload(); } } });
-  // d77: ☰ بقى شغال على كل المقاسات — موبايل يفتح/يقفل السايدبار العائم، وديسكتوب يخفي/يظهر عمود السايدبار (مع حفظ الحالة في localStorage)
   const isWide = () => globalThis.matchMedia('(min-width: 960px)').matches;
   const menuBtn = h('button', { class: 'icon-btn menu-btn', type: 'button', id: 'btn-menu', 'aria-label': t('Menu'), 'aria-expanded': 'false', on: { click: () => {
     if (isWide()) {
@@ -68,7 +86,6 @@ export function mountAdminApp(root, deps = {}) {
       menuBtn.setAttribute('aria-expanded', String(open));
     }
   } } }, '☰');
-  // d77: زرار ✕ جوه السايدبار نفسه — يقفله على الموبايل ويخفيه على الديسكتوب
   const closeBtn = h('button', { class: 'side-close', type: 'button', id: 'side-close', 'aria-label': t('Close menu'), title: t('Close menu'), on: { click: () => {
     if (isWide()) {
       shell.classList.add('side-off');
@@ -78,15 +95,15 @@ export function mountAdminApp(root, deps = {}) {
     }
     menuBtn.setAttribute('aria-expanded', 'false');
   } } }, '✕');
-  const themeBtn = initTheme(); // d70: زرار الوضع الليلي في الهيدر (بيتحفظ في localStorage)
-  const shell = h('div', { class: 'admin-shell' }, h('header', { class: 'app-header' }, menuBtn, h('div', { class: 'brand' }, h('img', { src: './assets/icons/icon-192.png', alt: '', width: 28, height: 28 }), h('span', {}, cfg().APP_NAME + ' - ' + t('Admin')), h('span', { class: 'ver', id: 'app-ver', title: 'App version' }, APP_VER)), bellBox, langBtn, themeBtn, who,
-    button(t('Sign out'), { small: true, id: 'btn-logout', on: { click: async () => { cleanup(); await api.logout(); notice = null; boot(); } } })), nav, content);
-  // d77: استرجاع حالة السايدبار المحفوظة (ديسكتوب بس — لو كان متخفي من آخر مرة يفضل مخفي)
+  const themeBtn = initTheme();
+  const shell = h('div', { class: 'admin-shell' }, h('header', { class: 'app-header' }, menuBtn, h('div', { class: 'brand' }, h('img', { src: './assets/icons/icon-192.png', alt: '', width: 28, height: 28 }), h('span', {}, cfg().APP_NAME + ' - ' + t('Admin')), h('span', { class: 'ver', id: 'app-ver', title: t('App version') }, APP_VER)), bellBox, langBtn, themeBtn, who,
+    button(t('Sign out'), { small: true, id: 'btn-logout', on: { click: async () => { clearCache(); cleanup(); await api.logout(); notice = null; boot(); } } })), nav, content);
   try { if (isWide() && localStorage.getItem('gops.admin.side') === 'off') shell.classList.add('side-off'); } catch (e) { /* ignore */ }
-  api.onSessionEnd((code) => { notice = errorMessage({ code }); cleanup(); boot(); });
+  api.onSessionEnd((code) => { notice = errorMessage({ code }); clearCache(); cleanup(); boot(); });
 
   function dropBell() { if (bell) { bell.destroy(); bell = null; } }
   function cleanup() { if (current && current.destroy) { try { current.destroy(); } catch (e) { /* ignore */ } } current = null; }
+
   function loginView() {
     dropBell();
     const f = buildForm([{ name: 'username', label: 'Username', required: true, autocomplete: 'username' }, { name: 'password', label: 'Password', type: 'password', required: true, autocomplete: 'current-password', trim: false }], {}, { submitLabel: t('Sign in'), onSubmit: async (v) => { await api.login(v.username, v.password); notice = null; boot(); } });
@@ -98,14 +115,18 @@ export function mountAdminApp(root, deps = {}) {
       submitLabel: t('Change password'), onSubmit: async (v) => { if (v.next !== v.again) throw Object.assign(new Error(t('The new passwords do not match.')), { code: 'VALIDATION_ERROR' }); await api.changePassword(v.current, v.next); toast(t('Password changed'), 'ok'); boot(); } });
     mount(root, h('main', { class: 'container narrow' }, h('section', { class: 'card login' }, h('h1', {}, t('Choose a new password')), h('p', {}, t('You must change your password before using the admin console.')), f.el, button(t('Sign out'), { small: true, on: { click: async () => { await api.logout(); boot(); } } }))));
   }
+
   async function boot() {
-    cleanup(); const s = api.session(); if (!s) return loginView();
+    clearCache(); cleanup(); const s = api.session(); if (!s) return loginView();
     if (s.user.must_change_password) return changePwView();
-    try { const u = await api.refreshUser(); s.user = u; } catch (e) { if (!api.session()) return; /* offline: keep cached profile */ }
+    try { const u = await api.refreshUser(); s.user = u; } catch (e) { if (!api.session()) return; }
     const user = api.session().user, allowed = ROUTES.filter((r) => r.nav && user.permissions.includes(r.perm));
-    if (bell) bell.destroy(); bell = createNotificationBell({ api, intervalMs: 300000 }); mount(bellBox, bell.el); mount(who, user.name); mount(nav, [closeBtn, ...allowed.map((r) => h('a', { href: `#/${r.path}`, dataset: { route: r.path } }, t(r.title)))]); mount(root, shell); // d77: ✕ أول عنصر في السايدبار
+    if (bell) bell.destroy(); bell = createNotificationBell({ api, intervalMs: 300000 }); mount(bellBox, bell.el); mount(who, user.name);
+    mount(nav, [closeBtn, ...allowed.map((r) => h('a', { href: `#/${r.path}`, dataset: { route: r.path } }, t(r.title)))]);
+    mount(root, shell);
     if (!parseHash(globalThis.location.hash).path) globalThis.location.hash = `#/${allowed[0] ? allowed[0].path : 'dashboard'}`; else route();
   }
+
   async function route() {
     const s = api.session(); if (!s || s.user.must_change_password) return;
     const { path, params } = parseHash(globalThis.location.hash), r = ROUTES.find((x) => x.path === path), user = s.user;
@@ -113,14 +134,32 @@ export function mountAdminApp(root, deps = {}) {
     nav.querySelectorAll('a').forEach((a) => { const on = a.dataset.route === path || (path === 'employee' && a.dataset.route === 'employees'); a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     if (!r) return mount(content, h('h1', {}, t('Page not found')));
     if (!user.permissions.includes(r.perm)) return mount(content, h('div', { class: 'alert alert-bad', id: 'forbidden' }, t('You do not have permission to open this page.')));
+
+    // ── Cache check: لو الصفحة محملة قبل كده — اعرضها فوراً ──
+    const cached = getCached(path);
+    if (cached) {
+      current = cached.page;
+      mount(content, cached.page.el);
+      document.title = `${t(r.title)} - ${cfg().APP_NAME}`;
+      content.focus({ preventScroll: true });
+      // حدّث البيانات في الخلفية بهدوء — listPage بيسمي الدالة reload وبعض الصفحات refresh
+      const bg = cached.page.refresh || cached.page.reload;
+      if (bg) { try { bg.call(cached.page).catch(() => {}); } catch (e) { /* ignore */ } }
+      return;
+    }
+    // ──────────────────────────────────────────────────────────────
+
     mount(content, h('p', { class: 'spinner' }, t('Loading...')));
     const my = {}; current = my;
     try {
       const page = await r.page({ api, lookups, user, params, navigate: (p) => { globalThis.location.hash = `#/${p}`; } });
       if (current !== my) { if (page.destroy) page.destroy(); return; }
-      current = page; mount(content, page.el); document.title = `${t(r.title)} - ${cfg().APP_NAME}`; content.focus({ preventScroll: true });
+      current = page;
+      setCache(path, page); // ← حفظ في الـ cache
+      mount(content, page.el); document.title = `${t(r.title)} - ${cfg().APP_NAME}`; content.focus({ preventScroll: true });
     } catch (e) { if (current === my) mount(content, h('div', { class: 'alert alert-bad', role: 'alert' }, errorMessage(e))); }
   }
+
   globalThis.addEventListener('hashchange', route);
   boot();
   return { api, boot, route };
