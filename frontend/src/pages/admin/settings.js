@@ -45,38 +45,107 @@ export async function settingsPage(ctx) {
     } catch (e) { arch.replaceChildren(h('p', { class: 'hint' }, t('Archive status unavailable.'))); }
   }
 
-  // ── KPI Configuration card ─────────────────────────────────────────
+  // ── KPI Configuration card (تصميم جديد - بطاقات) ─────────────────
   const kpiCard = h('section', { class: 'card', id: 'kpi-card' });
+
+  // أيقونة لكل معيار
+  const METRIC_ICONS = {
+    late:                 '⏰',
+    late_minutes:         '⏱️',
+    absent:               '🚫',
+    early_checkout:       '🏃',
+    missing_checkout:     '📋',
+    break_exceeded:       '☕',
+    break_exceeded_count: '🔁',
+    geofence_exits:       '📍',
+    geofence_minutes:     '🗺️',
+    geofence_longest:     '📏',
+    gps_gaps:             '📡',
+    gps_gaps_count:       '📶',
+    tracking_unavailable: '⚠️'
+  };
+
+  // لون الكارت حسب الفئة
+  function metricColor(key) {
+    if (['late','late_minutes'].includes(key))                       return '#E65100';
+    if (['absent','missing_checkout','early_checkout'].includes(key)) return '#C62828';
+    if (['break_exceeded','break_exceeded_count'].includes(key))      return '#F57F17';
+    if (['geofence_exits','geofence_minutes','geofence_longest'].includes(key)) return '#1565C0';
+    return '#2E7D32';
+  }
 
   async function loadKpi() {
     if (!can) return;
+    kpiCard.replaceChildren(spinner());
     try {
       const { metrics, config } = await ctx.api.call('getKpiConfig', {});
-      const kpiRows = metrics.map((m) => {
-        const mcfg = config[m.key] || {};
-        return h('tr', {},
-          // اسم المعيار
-          h('td', {}, h('strong', {}, m.label), h('br'), h('small', { class: 'hint' }, m.unit)),
-          // تفعيل
-          h('td', { style: 'text-align:center' },
-            h('input', { type: 'checkbox', id: `kpi-en-${m.key}`, checked: !!mcfg.enabled })
+
+      // بناء الكروت
+      const cards = metrics.map((m) => {
+        const mcfg  = config[m.key] || {};
+        const icon  = METRIC_ICONS[m.key] || '📊';
+        const color = metricColor(m.key);
+        const enabled = !!mcfg.enabled;
+        const unitLabel = m.unit === 'times' ? t('times') : t('min');
+
+        const card = h('div', {
+          class: 'kpi-metric-card',
+          id: `kpi-card-${m.key}`,
+          style: `background:var(--card);border:2px solid ${enabled ? color : 'var(--line)'};border-radius:12px;padding:14px;transition:border-color .2s`
+        },
+          // Header: أيقونة + اسم + toggle
+          h('div', { style: 'display:flex;align-items:center;gap:10px;margin-bottom:12px' },
+            h('span', { style: `font-size:1.5rem;width:36px;height:36px;border-radius:8px;background:${color}22;display:flex;align-items:center;justify-content:center` }, icon),
+            h('div', { style: 'flex:1' },
+              h('strong', { style: 'display:block;font-size:.9rem' }, m.label),
+              h('small', { style: 'color:var(--muted);font-size:.78rem' }, unitLabel)
+            ),
+            // Toggle switch
+            h('label', { style: 'display:flex;align-items:center;gap:6px;cursor:pointer' },
+              h('input', {
+                type: 'checkbox',
+                id: `kpi-en-${m.key}`,
+                checked: enabled,
+                style: 'width:20px;height:20px;accent-color:' + color,
+                on: {
+                  change: (e) => {
+                    const c = document.getElementById(`kpi-card-${m.key}`);
+                    if (c) c.style.borderColor = e.target.checked ? color : 'var(--line)';
+                  }
+                }
+              })
+            )
           ),
-          // الوزن
-          h('td', {},
-            h('input', { type: 'number', id: `kpi-w-${m.key}`, value: mcfg.weight || 20, min: 1, max: 100, style: 'width:60px' }),
-            h('span', { class: 'hint' }, ' %')
-          ),
-          // الـ threshold
-          h('td', {},
-            h('input', { type: 'number', id: `kpi-t-${m.key}`, value: mcfg.threshold || 1, min: 0, max: 999, style: 'width:60px' }),
-            h('span', { class: 'hint' }, ' ' + (m.unit === 'times' ? t('times') : t('min')))
-          ),
-          // الخصم لكل وحدة
-          h('td', {},
-            h('input', { type: 'number', id: `kpi-p-${m.key}`, value: mcfg.penalty || 5, min: 1, max: 50, style: 'width:60px' }),
-            h('span', { class: 'hint' }, ' %/' + (m.unit === 'times' ? t('time') : t('min')))
+
+          // Fields: وزن + حد + خصم في صف واحد
+          h('div', { style: 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px' },
+            // الوزن
+            h('div', {},
+              h('label', { style: 'display:block;font-size:.75rem;color:var(--muted);margin-bottom:4px;font-weight:600' }, t('Weight')),
+              h('div', { style: 'display:flex;align-items:center;gap:4px' },
+                h('input', { type: 'number', id: `kpi-w-${m.key}`, value: mcfg.weight || 20, min: 1, max: 100, style: 'width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;background:var(--bg);color:var(--text)' }),
+                h('span', { style: 'font-size:.75rem;color:var(--muted);white-space:nowrap' }, '%')
+              )
+            ),
+            // الحد المسموح
+            h('div', {},
+              h('label', { style: 'display:block;font-size:.75rem;color:var(--muted);margin-bottom:4px;font-weight:600' }, t('Allowed')),
+              h('div', { style: 'display:flex;align-items:center;gap:4px' },
+                h('input', { type: 'number', id: `kpi-t-${m.key}`, value: mcfg.threshold || 1, min: 0, max: 999, style: 'width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;background:var(--bg);color:var(--text)' }),
+                h('span', { style: 'font-size:.75rem;color:var(--muted);white-space:nowrap' }, unitLabel)
+              )
+            ),
+            // الخصم
+            h('div', {},
+              h('label', { style: 'display:block;font-size:.75rem;color:var(--muted);margin-bottom:4px;font-weight:600' }, t('Deduct')),
+              h('div', { style: 'display:flex;align-items:center;gap:4px' },
+                h('input', { type: 'number', id: `kpi-p-${m.key}`, value: mcfg.penalty || 5, min: 1, max: 50, style: 'width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;background:var(--bg);color:var(--text)' }),
+                h('span', { style: 'font-size:.75rem;color:var(--muted);white-space:nowrap' }, '%')
+              )
+            )
           )
         );
+        return card;
       });
 
       const saveBtn = button(t('Save KPI settings'), {
@@ -90,7 +159,7 @@ export async function settingsPage(ctx) {
               const thr = globalThis.document.getElementById(`kpi-t-${m.key}`);
               const pen = globalThis.document.getElementById(`kpi-p-${m.key}`);
               newCfg[m.key] = {
-                enabled:   en  ? en.checked : false,
+                enabled:   en  ? en.checked        : false,
                 weight:    w   ? Number(w.value)   : 20,
                 threshold: thr ? Number(thr.value) : 1,
                 penalty:   pen ? Number(pen.value) : 5
@@ -106,22 +175,9 @@ export async function settingsPage(ctx) {
 
       kpiCard.replaceChildren(
         h('h2', {}, '📊 ' + t('KPI Configuration')),
-        h('p', { class: 'hint' }, t('Choose which metrics count toward the KPI score, their weight (%), the allowed threshold before deductions start, and the deduction per unit above the threshold.')),
-        h('div', { style: 'overflow-x:auto' },
-          h('table', { class: 'data-table', style: 'min-width:600px' },
-            h('thead', {},
-              h('tr', {},
-                h('th', {}, t('Metric')),
-                h('th', {}, t('Active')),
-                h('th', {}, t('Weight')),
-                h('th', {}, t('Threshold (allowed)')),
-                h('th', {}, t('Deduction per unit'))
-              )
-            ),
-            h('tbody', {}, ...kpiRows)
-          )
-        ),
-        h('div', { style: 'margin-top:12px' }, saveBtn)
+        h('p', { class: 'hint' }, t('Enable the metrics you want, set their weight (%), the allowed amount before deductions start, and the deduction percentage per unit over the threshold.')),
+        h('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin:14px 0' }, ...cards),
+        h('div', { style: 'margin-top:4px' }, saveBtn)
       );
     } catch (e) { kpiCard.replaceChildren(errorBox(e)); }
   }
