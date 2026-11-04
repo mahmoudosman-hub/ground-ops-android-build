@@ -547,7 +547,14 @@ const AR = {
   'You are offline. Starting a break needs a connection.': 'أنت أوفلاين — بدء البريك محتاج نت.',
 
   // ---------- d77: تحكم إظهار/إخفاء السايدبار ----------
-  'Close menu': 'قفل القائمة'
+  'Close menu': 'قفل القائمة',
+
+  // ---------- d79: تسريبات لغوية في ابليكشن الكابتن — تابات + شارات + KPI ----------
+  'Home': 'الرئيسية', 'My schedule': 'جدولي', 'Requests': 'الطلبات',
+  'Online': 'متصل', 'minutes': 'دقائق', 'No notifications': 'لا توجد إشعارات',
+  'Absence': 'الغياب', 'Early leave': 'الانصراف المبكر', 'Forgot checkout': 'نسيان تسجيل الانصراف',
+  'Break overtime (minutes)': 'تجاوز وقت البريك (دقائق)', 'Branch exits': 'عدد مرات الخروج من الفروع',
+  'GPS stale (minutes)': 'GPS دقائق بدون تحديث'
 };
 
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً

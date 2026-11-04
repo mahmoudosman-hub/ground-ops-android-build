@@ -1,6 +1,6 @@
 /** Captain screens: "My schedule" and "Requests" (swaps, leave incl. sick with proof files, early leave). All rules are enforced by the server; this file only collects input and shows results. */
 import { h, mount } from '../../core/dom.js';
-import { t } from '../../core/i18n.js';
+import { t, getLang } from '../../core/i18n.js';
 import { fmtDate, fmtDateTime, todayLocal, addDays } from '../../core/time.js';
 import { errorMessage } from '../../core/errors.js';
 import { badge, button, buildForm, openModal, spinner, toast, toastError, emptyState, errorBox } from '../../components/ui.js';
@@ -11,7 +11,7 @@ const coded = (code, msg) => Object.assign(new Error(msg), { code });
 const TYPE_LABEL = { SHIFT_SWAP: 'Shift swap', OFF_SWAP: 'Days-off swap', EARLY_LEAVE: 'Early leave' };
 const LEAVE_LABEL = { ANNUAL: 'Annual leave', CASUAL: 'Casual leave', SICK: 'Sick leave', OTHER: 'Other leave' };
 export const requestTypeLabel = (r) => t(r.type === 'LEAVE' ? (LEAVE_LABEL[r.leave_type] || 'Leave') : (TYPE_LABEL[r.type] || r.type));
-const weekday = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString(undefined, { weekday: 'short', timeZone: 'UTC' });
+const weekday = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString(getLang() === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'short', timeZone: 'UTC' }); // d79: كانت بلمغة الجهاز — بتظهر Wed في النسخة العربية
 
 /* ---------------- My schedule ---------------- */
 export function createScheduleView({ api }) {

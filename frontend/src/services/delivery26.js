@@ -46,11 +46,22 @@
     popups.forEach(function(p) { p.style.display = 'none'; });
   }
 
+  // d79: كشف اللغة عشان الرسائل المكتوبة هنا متبقاش عربي في النسخة الإنجليزية
+  function detectLang() {
+    try {
+      var l = localStorage.getItem('gops.lang');
+      if (l === 'ar') return 'ar';
+      if (l === 'en') return 'en';
+    } catch (e) {}
+    return /^ar/i.test(document.documentElement.lang || '') ? 'ar' : 'en';
+  }
+
   // دالة لمسح الإشعارات من الشاشة
   function clearNotificationsUI() {
     var lists = document.querySelectorAll('.notifications-dropdown, .notification-list');
+    var emptyMsg = detectLang() === 'ar' ? 'لا توجد إشعارات جديدة' : 'No new notifications';
     lists.forEach(function(list) {
-      list.innerHTML = '<div style="padding:20px;text-align:center;color:#888;">لا توجد إشعارات جديدة</div>';
+      list.innerHTML = '<div style="padding:20px;text-align:center;color:#888;">' + emptyMsg + '</div>';
     });
     closePopup();
   }

@@ -5,6 +5,16 @@
   'use strict';
   if (!/admin\.html/i.test(window.location.pathname)) return;
 
+  // d79: كشف اللغة — زرار Apply كان بيرجع إنجليزي ثابت في النسخة العربية
+  function detectLang() {
+    try {
+      var l = localStorage.getItem('gops.lang');
+      if (l === 'ar') return 'ar';
+      if (l === 'en') return 'en';
+    } catch (e) {}
+    return /^ar/i.test(document.documentElement.lang || '') ? 'ar' : 'en';
+  }
+
   // دالة بتدور على الزرار اللي شايل لودينج وتفكه
   function unlockApplyButton() {
     var btns = document.querySelectorAll('button');
@@ -15,7 +25,7 @@
         // لو بيحمل، بنفكه
         if (b.disabled || b.innerHTML.includes('spinner') || b.innerHTML.includes('...')) {
             b.disabled = false;
-            b.innerHTML = 'Apply';
+            b.innerHTML = detectLang() === 'ar' ? 'تطبيق' : 'Apply';
             b.style.opacity = '1';
             b.style.pointerEvents = '';
             b.classList.remove('gops-loading');

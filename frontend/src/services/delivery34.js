@@ -5,6 +5,16 @@
   'use strict';
   if (!/admin\.html/i.test(window.location.pathname)) return;
 
+  // d79: كشف اللغة — الرسائل ثابتة هنا كانت عربي في النسخة الإنجليزية
+  function detectLang() {
+    try {
+      var l = localStorage.getItem('gops.lang');
+      if (l === 'ar') return 'ar';
+      if (l === 'en') return 'en';
+    } catch (e) {}
+    return /^ar/i.test(document.documentElement.lang || '') ? 'ar' : 'en';
+  }
+
   // بنمسك أي ضغطة على زرار قبل ما كود الموقع الأصلي يحس بيها
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('button, a, div[role="button"]');
@@ -20,8 +30,8 @@
       e.stopPropagation();
       e.stopImmediatePropagation();
 
-      // 2. بنرجع الزرار لشكله الطبيعي فوراً
-      btn.innerText = 'Mark all as read';
+      // 2. بنرجع الزرار لشكله الطبيعي فوراً — d79: بلغة الواجهة مش إنجليزي ثابت
+      btn.innerText = detectLang() === 'ar' ? 'قراءة الكل' : 'Mark all as read';
       btn.disabled = false;
       btn.style.opacity = '1';
 
@@ -36,7 +46,7 @@
         if (!popup.querySelector('.gops-empty-msg')) {
            var msg = document.createElement('div');
            msg.className = 'gops-empty-msg';
-           msg.innerText = 'لا توجد إشعارات جديدة';
+           msg.innerText = detectLang() === 'ar' ? 'لا توجد إشعارات جديدة' : 'No new notifications';
            msg.style.cssText = 'padding: 20px; text-align: center; color: #888;';
            // نحطها قبل زراير الأكشن
            var footer = btn.parentElement.parentElement;

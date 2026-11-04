@@ -13,7 +13,7 @@
  * - مفتاح الجلسة الصحيح gops.session.employee (زي النسخة القديمة)
  * - polling دائم خفيف: بعد أي logout/login التابات بتتبني من جديد والتاب بيرجع لوحده
  */
-import { t } from '../core/i18n.js';
+import { t, getLang } from '../core/i18n.js'; // d79: getLang لاسم الشهر
 
 (function () {
   'use strict';
@@ -24,6 +24,29 @@ import { t } from '../core/i18n.js';
   var BAD   = 'var(--bad, #C62828)';
   var WARN  = 'var(--warn, #E65100)';
   var INFO  = 'var(--info, #1565C0)';
+
+  // ── d79: labels الـ KPI بتيجي من السيرفر (عربي غالبًا) — بنحولها لمفاتيح ترجمة ──
+  // كده النسخة العربية تعرض العربي والإنجليزية تعرض الإنجليزي مهما كان لغة السيرفر
+  var METRIC_LABEL_KEYS = {
+    'عدد مرات التأخير': 'Late arrivals',
+    'الغياب': 'Absence',
+    'الانصراف المبكر': 'Early leave',
+    'نسيان تسجيل الانصراف': 'Forgot checkout',
+    'تجاوز وقت البريك (دقائق)': 'Break overtime (minutes)',
+    'عدد مرات الخروج من الفروع': 'Branch exits',
+    'GPS دقائق بدون تحديث': 'GPS stale (minutes)'
+  };
+  function metricLabel(label) { return t(METRIC_LABEL_KEYS[label] || label); }
+  var METRIC_UNIT_KEYS = { times: 'times', minutes: 'minutes', days: 'days', min: 'min' };
+  function metricUnit(u) { return u ? ' ' + t(METRIC_UNIT_KEYS[u] || u) : ''; }
+  var AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  var EN_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  // d79: اسم الشهر كان بيجي من السيرفر إنجليزي دايمًا — بنبنيه هنا حسب لغة التطبيق
+  function monthLabel(ym) {
+    var p = String(ym || '').split('-'), i = parseInt(p[1], 10) - 1;
+    if (p.length < 2 || isNaN(i) || i < 0 || i > 11) return ym;
+    return (getLang() === 'ar' ? AR_MONTHS[i] : EN_MONTHS[i]) + ' ' + p[0];
+  }
 
   // ── الحالة ───────────────────────────────────────────────────────
   var tabEl = null, panelEl = null, loaded = false;
@@ -152,7 +175,7 @@ import { t } from '../core/i18n.js';
       var scoreLabel = score >= 90 ? t('Excellent') : score >= 70 ? t('Good') : t('Needs improvement');
 
       var kpiCard = div('background:var(--card,#fff);border:1px solid var(--line,#eee);border-radius:12px;padding:16px;margin-bottom:12px;border-top:4px solid ' + BRAND);
-      kpiCard.appendChild(el('h3', 'margin:0 0 12px;font-size:1rem;color:var(--text,#411517)', '📊 ' + t('My KPI') + ' — ' + (kpi.month_label || month)));
+      kpiCard.appendChild(el('h3', 'margin:0 0 12px;font-size:1rem;color:var(--text,#411517)', '📊 ' + t('My KPI') + ' — ' + monthLabel(month)));
 
       var scoreRow = div('display:flex;align-items:center;gap:14px;margin-bottom:14px');
       scoreRow.appendChild(el('span', 'font-size:2.4rem;font-weight:700;color:' + scoreColor, score + '%'));
@@ -167,8 +190,8 @@ import { t } from '../core/i18n.js';
       metrics.forEach(function (m) {
         var val = m.value || 0;
         var row = div('display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line,#eee);font-size:.88rem');
-        row.appendChild(el('span', 'color:var(--muted,#666)', m.label));
-        row.appendChild(el('span', 'font-weight:600;color:' + (val > 0 ? BAD : OK), val > 0 ? val + ' ' + (m.unit || '') : '✓'));
+        row.appendChild(el('span', 'color:var(--muted,#666)', metricLabel(m.label)));
+        row.appendChild(el('span', 'font-weight:600;color:' + (val > 0 ? BAD : OK), val > 0 ? val + metricUnit(m.unit) : '✓'));
         kpiCard.appendChild(row);
       });
 

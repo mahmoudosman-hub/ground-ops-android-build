@@ -165,7 +165,7 @@
     function render() {
       var l = getLang();
       btn.textContent = l === 'ar' ? 'EN' : 'ع';
-      btn.title = l === 'ar' ? 'Switch to English' : 'التبديل إلى العربية';
+      btn.title = l === 'ar' ? 'Switch to English' : 'Switch to Arabic'; // d79: كان بيرجّع عربي في النسخة الإنجليزية
       hintsBox.checked = hintsEnabled();
     }
     btn.onclick = function () {
