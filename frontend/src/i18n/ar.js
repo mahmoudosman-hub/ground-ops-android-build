@@ -544,7 +544,10 @@ const AR = {
   'Only photos and PDF files can be attached.': 'ممكن ترفع صور أو ملفات PDF بس.',
   'To date (same day if empty)': 'لحد تاريخ (نفس اليوم لو فاضي)',
   'You are offline. Ending a break needs a connection.': 'أنت أوفلاين — قفل البريك محتاج نت.',
-  'You are offline. Starting a break needs a connection.': 'أنت أوفلاين — بدء البريك محتاج نت.'
+  'You are offline. Starting a break needs a connection.': 'أنت أوفلاين — بدء البريك محتاج نت.',
+
+  // ---------- d77: تحكم إظهار/إخفاء السايدبار ----------
+  'Close menu': 'قفل القائمة'
 };
 
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً

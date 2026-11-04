@@ -53,13 +53,36 @@ export function mountAdminApp(root, deps = {}) {
   const api = deps.api || createApi('admin'), lookups = createLookups(api);
   let current = null, notice = null, bell = null;
   const content = h('main', { id: 'main', class: 'content', tabindex: '-1' }), nav = h('nav', { class: 'sidebar', id: 'sidebar', 'aria-label': t('Main navigation') }), who = h('span', { class: 'who' }), bellBox = h('span', { id: 'bell-box' });
-  const APP_VER = 'd76'; // d76: إصلاح اختفاء أزرار السايدبار السفلية في الوضع اللايت (Language/Hints/Week Grid/Selfie/Auto Scheduler/إشعار) — color: var(--sidebar-text) على .sidebar // d75: توحيد اللغات — 324 مفتاح ترجمة جديد في ar.js + تغليف كل النصوص الهاردكود بـ t() (delivery9/18/30/31/36 + ping-response + pray26 + كارت الآيفون) // d74: تحديث app.css — Dark Mode أفتح وأوضح (#221010/#2E1618 + muted #B09080) + سايدبار أغمق (#2C0E10) مع الحفاظ على بلوك الـ compat (.big/.sr-only/.btn-danger/.ver) // d73: تاب «📊 إحصائياتي» في شريط تابات الكابتن (delivery32.js) — KPI + إحصائيات الشهر كصفحة كاملة بدل الكارت في الهوم // d72: كارت «مؤشرات أدائي» (getMyKpi) في هوم الكابتن + زرار تبديل اللغة عربي/English في هيدر الكابتن
+  const APP_VER = 'd77'; // d77: تحكم إظهار/إخفاء السايدبار — زرار ✕ جوه السايدبار + ☰ شغال على كل المقاسات (ديسكتوب يخفي/يظهر العمود مع حفظ الحالة) // d76: إصلاح اختفاء أزرار السايدبار السفلية في الوضع اللايت (Language/Hints/Week Grid/Selfie/Auto Scheduler/إشعار) — color: var(--sidebar-text) على .sidebar // d75: توحيد اللغات — 324 مفتاح ترجمة جديد في ar.js + تغليف كل النصوص الهاردكود بـ t() (delivery9/18/30/31/36 + ping-response + pray26 + كارت الآيفون) // d74: تحديث app.css — Dark Mode أفتح وأوضح (#221010/#2E1618 + muted #B09080) + سايدبار أغمق (#2C0E10) مع الحفاظ على بلوك الـ compat (.big/.sr-only/.btn-danger/.ver) // d73: تاب «📊 إحصائياتي» في شريط تابات الكابتن (delivery32.js) — KPI + إحصائيات الشهر كصفحة كاملة بدل الكارت في الهوم // d72: كارت «مؤشرات أدائي» (getMyKpi) في هوم الكابتن + زرار تبديل اللغة عربي/English في هيدر الكابتن
   // زرار اللغة: يقلب الواجهة كلها عربي/إنجليزي ويحفظ الاختيار (d47)
   const langBtn = button(getLang() === 'ar' ? 'EN' : 'عربي', { small: true, id: 'btn-lang', aria: 'Language / اللغة', on: { click: () => { const next = getLang() === 'ar' ? 'en' : 'ar'; setLang(next); try { localStorage.setItem('gops.admin.lang', next); localStorage.setItem('gops.lang.user', '1'); } catch (e) { /* ignore */ } globalThis.location.reload(); } } });
-  const menuBtn = h('button', { class: 'icon-btn menu-btn', type: 'button', id: 'btn-menu', 'aria-label': t('Menu'), 'aria-expanded': 'false', on: { click: () => { const open = nav.classList.toggle('open'); menuBtn.setAttribute('aria-expanded', String(open)); } } }, '☰');
+  // d77: ☰ بقى شغال على كل المقاسات — موبايل يفتح/يقفل السايدبار العائم، وديسكتوب يخفي/يظهر عمود السايدبار (مع حفظ الحالة في localStorage)
+  const isWide = () => globalThis.matchMedia('(min-width: 960px)').matches;
+  const menuBtn = h('button', { class: 'icon-btn menu-btn', type: 'button', id: 'btn-menu', 'aria-label': t('Menu'), 'aria-expanded': 'false', on: { click: () => {
+    if (isWide()) {
+      const off = shell.classList.toggle('side-off');
+      menuBtn.setAttribute('aria-expanded', String(!off));
+      try { localStorage.setItem('gops.admin.side', off ? 'off' : 'on'); } catch (e) { /* ignore */ }
+    } else {
+      const open = nav.classList.toggle('open');
+      menuBtn.setAttribute('aria-expanded', String(open));
+    }
+  } } }, '☰');
+  // d77: زرار ✕ جوه السايدبار نفسه — يقفله على الموبايل ويخفيه على الديسكتوب
+  const closeBtn = h('button', { class: 'side-close', type: 'button', id: 'side-close', 'aria-label': t('Close menu'), title: t('Close menu'), on: { click: () => {
+    if (isWide()) {
+      shell.classList.add('side-off');
+      try { localStorage.setItem('gops.admin.side', 'off'); } catch (e) { /* ignore */ }
+    } else {
+      nav.classList.remove('open');
+    }
+    menuBtn.setAttribute('aria-expanded', 'false');
+  } } }, '✕');
   const themeBtn = initTheme(); // d70: زرار الوضع الليلي في الهيدر (بيتحفظ في localStorage)
   const shell = h('div', { class: 'admin-shell' }, h('header', { class: 'app-header' }, menuBtn, h('div', { class: 'brand' }, h('img', { src: './assets/icons/icon-192.png', alt: '', width: 28, height: 28 }), h('span', {}, cfg().APP_NAME + ' - ' + t('Admin')), h('span', { class: 'ver', id: 'app-ver', title: 'App version' }, APP_VER)), bellBox, langBtn, themeBtn, who,
     button(t('Sign out'), { small: true, id: 'btn-logout', on: { click: async () => { cleanup(); await api.logout(); notice = null; boot(); } } })), nav, content);
+  // d77: استرجاع حالة السايدبار المحفوظة (ديسكتوب بس — لو كان متخفي من آخر مرة يفضل مخفي)
+  try { if (isWide() && localStorage.getItem('gops.admin.side') === 'off') shell.classList.add('side-off'); } catch (e) { /* ignore */ }
   api.onSessionEnd((code) => { notice = errorMessage({ code }); cleanup(); boot(); });
 
   function dropBell() { if (bell) { bell.destroy(); bell = null; } }
@@ -80,7 +103,7 @@ export function mountAdminApp(root, deps = {}) {
     if (s.user.must_change_password) return changePwView();
     try { const u = await api.refreshUser(); s.user = u; } catch (e) { if (!api.session()) return; /* offline: keep cached profile */ }
     const user = api.session().user, allowed = ROUTES.filter((r) => r.nav && user.permissions.includes(r.perm));
-    if (bell) bell.destroy(); bell = createNotificationBell({ api, intervalMs: 300000 }); mount(bellBox, bell.el); mount(who, user.name); mount(nav, allowed.map((r) => h('a', { href: `#/${r.path}`, dataset: { route: r.path } }, t(r.title)))); mount(root, shell);
+    if (bell) bell.destroy(); bell = createNotificationBell({ api, intervalMs: 300000 }); mount(bellBox, bell.el); mount(who, user.name); mount(nav, [closeBtn, ...allowed.map((r) => h('a', { href: `#/${r.path}`, dataset: { route: r.path } }, t(r.title)))]); mount(root, shell); // d77: ✕ أول عنصر في السايدبار
     if (!parseHash(globalThis.location.hash).path) globalThis.location.hash = `#/${allowed[0] ? allowed[0].path : 'dashboard'}`; else route();
   }
   async function route() {
