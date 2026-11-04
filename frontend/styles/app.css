@@ -273,7 +273,7 @@ input[type=checkbox] { width: 24px; height: 24px; min-height: 0; accent-color: v
 }
 
 /* ---- Admin layout ---- */
-.admin-shell { display: grid; grid-template-columns: 1fr; grid-template-areas: "head" "main"; min-height: 100vh; }
+.admin-shell { display: grid; grid-template-columns: 1fr; grid-template-rows: auto 1fr; grid-template-areas: "head" "main"; min-height: 100vh; } /* d78: صفوف ثابتة auto 1fr — بدونها align-content:stretch بيوزع المساحة الفاضية على صف الهيدر فينفخ لما المحتوى قصير أو السايدبار مخفي */
 .admin-shell > .app-header { grid-area: head; }
 .content { grid-area: main; padding: var(--gap); min-width: 0; outline: none; }
 .sidebar {
@@ -319,7 +319,7 @@ input[type=checkbox] { width: 24px; height: 24px; min-height: 0; accent-color: v
   .btn-big { max-width: 420px; }
 }
 @media (min-width: 960px) {
-  .admin-shell { grid-template-columns: 220px 1fr; grid-template-areas: "head head" "side main"; }
+  .admin-shell { grid-template-columns: 220px 1fr; grid-template-rows: auto 1fr; grid-template-areas: "head head" "side main"; }
   /* d77: ☰ ظاهر على الديسكتوب كمان — هو زرار الإظهار/الإخفاء */
   .sidebar { position: sticky; top: 52px; grid-area: side; transform: none !important; width: auto; height: calc(100vh - 52px); padding-top: 12px; z-index: 5; }
   /* d77: السايدبار المخفي على الديسكتوب — العمود بيتقفل والمحتوى ياخد العرض كله */
