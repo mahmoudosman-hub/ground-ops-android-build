@@ -45,6 +45,49 @@ export async function settingsPage(ctx) {
     } catch (e) { arch.replaceChildren(h('p', { class: 'hint' }, t('Archive status unavailable.'))); }
   }
 
+  // ── Late Permission card (d82) ────────────────────────────────────
+  const lateCard = h('section', { class: 'card', id: 'late-permission-card' });
+
+  async function loadLatePermission() {
+    if (!can) return;
+    try {
+      // القيمة الحالية من السيرفر — لو الأكشن لسه مش متضاف في Apps Script يرجع 15 كافتراضي
+      const current = await ctx.api.call('getLatePermissionMinutes', {}).catch(() => ({ minutes: 15 }));
+      const mins = current.minutes != null ? current.minutes : 15;
+
+      const input = h('input', {
+        type: 'number', min: 0, max: 120, value: mins,
+        style: 'width:80px;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:1rem;background:var(--bg);color:var(--text)'
+      });
+
+      const saveBtn = button(t('Save'), {
+        kind: 'primary', small: true,
+        on: {
+          click: async () => {
+            const val = Number(input.value);
+            if (isNaN(val) || val < 0 || val > 120) { toast(t('Value must be between 0 and 120'), 'warn'); return; }
+            try {
+              await ctx.api.call('updateLatePermissionMinutes', { minutes: val });
+              toast(t('Saved ✅'), 'ok');
+            } catch (e) { toastError(e); }
+          }
+        }
+      });
+
+      lateCard.replaceChildren(
+        h('h2', {}, t('⏰ Late permission')),
+        h('p', { class: 'hint' }, t('Minimum time (in minutes) before shift start for the captain to submit a late permission request.')),
+        h('div', { style: 'display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap' },
+          h('span', { style: 'font-weight:600' }, t('Allowed time:')),
+          input,
+          h('span', { style: 'color:var(--muted)' }, t('minutes before the shift')),
+          saveBtn
+        ),
+        h('p', { class: 'hint', style: 'margin-top:8px' }, t('Example: 15 means the captain must send the request at least 15 minutes before the shift.'))
+      );
+    } catch (e) { lateCard.replaceChildren(errorBox(e)); }
+  }
+
   // ── KPI Configuration card (تصميم جديد - بطاقات) ─────────────────
   const kpiCard = h('section', { class: 'card', id: 'kpi-card' });
 
@@ -196,13 +239,14 @@ export async function settingsPage(ctx) {
     } catch (e) { kpiCard.replaceChildren(errorBox(e)); }
   }
 
-  load(); loadArchive(); loadKpi();
+  load(); loadArchive(); loadKpi(); loadLatePermission();
 
   return {
     el: h('div', {},
       h('h1', {}, t('Settings')),
       box,
       arch,
+      lateCard,
       kpiCard
     )
   };

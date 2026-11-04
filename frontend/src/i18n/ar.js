@@ -126,6 +126,16 @@ const AR = {
   ' — how important this metric is compared to the others (e.g. Late 30% vs Absent 20% means Late matters more)': ' — أهمية المعيار ده بالنسبة لباقي المعايير (مثال: التأخير 30% والغياب 20% يعني التأخير أهم)',
   ' — the normal accepted amount before we start deducting (e.g. one late arrival per month is fine)': ' — الحد الطبيعي المقبول قبل ما نبدأ نخصم (مثال: تأخيرة واحدة في الشهر مقبولة)',
   ' — percentage deducted from the KPI score per unit over the limit (e.g. each extra late arrival = -5%)': ' — نسبة بتتخصم من درجة الكابتن لكل وحدة زيادة عن الحد (مثال: كل تأخيرة زيادة = -5%)',
+  // d82: كارت إذن التأخير في الإعدادات
+  'Save': 'حفظ', 'Saved ✅': 'تم الحفظ ✅',
+  'Value must be between 0 and 120': 'القيمة لازم تكون بين 0 و 120',
+  'Minimum time (in minutes) before shift start for the captain to submit a late permission request.': 'الحد الأدنى للوقت (بالدقائق) قبل بداية الشيفت اللي الكابتن يقدر يبعت فيه طلب إذن تأخير.',
+  'Allowed time:': 'الوقت المسموح:',
+  'minutes before the shift': 'دقيقة قبل الشيفت',
+  'Example: 15 means the captain must send the request at least 15 minutes before the shift.': 'مثال: 15 يعني الكابتن لازم يبعت الطلب قبل الشيفت بـ 15 دقيقة على الأقل.',
+  // d82: تعديلات تاب الطلبات (ريفرش تلقائي + badge المعلقة)
+  'pending': 'قيد الانتظار',
+  'This page refreshes automatically every 30 seconds.': 'الصفحة دي بتتحدث تلقائي كل 30 ثانية.',
   'Settings': 'الإعدادات', 'Save settings': 'حفظ الإعدادات', 'No changes': 'مفيش تغييرات', 'Settings saved': 'الإعدادات اتحفظت ✅',
   'Location log archive': 'أرشيف سجل المواقع', 'Archive now': 'أرشفة دلوقتي',
   'Archive status unavailable.': 'حالة الأرشيف مش متاحة.',

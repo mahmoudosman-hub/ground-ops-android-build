@@ -46,12 +46,59 @@ export function openReview(ctx, id, onDone) {
 }
 
 export async function requestsPage(ctx) {
+  // ── d70: auto-refresh ذكي ─────────────────────────────────────────
+  // لو فيه requests pending → refresh كل 30 ثانية
+  // لو مفيش → refresh كل 5 دقائق (توفير في الـ quota)
+  let pendingCount = 0;
+  let autoMs = 300000; // 5 دقائق افتراضي
+  // ─────────────────────────────────────────────────────────────────
+
   const lp = listPage({
-    filters: [{ name: 'status', label: 'Status', type: 'select', options: STATUS.map((s) => opt(s[0], t(s[1]))), value: 'PENDING_ADMIN' }, { name: 'type', label: 'Type', type: 'select', options: TYPES.map((s) => opt(s[0], t(s[1]))) }, { name: 'employee_id', label: 'Employee ID' }],
-    columns: [{ key: 'created_at', label: 'Sent', render: (r) => fmtDateTime(r.created_at) }, { key: 'type', label: 'Type', render: (r) => requestTypeLabel(r) }, { key: 'summary', label: 'Request' }, { key: 'status', label: 'Status', render: (r) => badge(r.status) },
-      { key: 'file_count', label: 'Files', render: (r) => (r.file_count ? String(r.file_count) : '-') }, { key: 'actions', label: 'Actions', render: (r) => button(t('Review'), { small: true, class: 'review', on: { click: () => openReview(ctx, r.request_id, () => lp.reload()) } }) }],
-    empty: t('No requests match.'), auto: 300000,
-    async load(f, page) { const res = await ctx.api.call('getRequests', { ...clean(f), page, page_size: 50 }); return { items: res.items, total: res.total, page: res.page, page_size: res.page_size, before: h('p', { class: 'hint', id: 'open-count' }, t('{n} request(s) waiting for your decision.', { n: res.open_count })) }; }
+    filters: [
+      { name: 'status', label: 'Status', type: 'select', options: STATUS.map((s) => opt(s[0], t(s[1]))), value: 'PENDING_ADMIN' },
+      { name: 'type', label: 'Type', type: 'select', options: TYPES.map((s) => opt(s[0], t(s[1]))) },
+      { name: 'employee_id', label: 'Employee ID' }
+    ],
+    columns: [
+      { key: 'created_at', label: 'Sent', render: (r) => fmtDateTime(r.created_at) },
+      { key: 'type', label: 'Type', render: (r) => requestTypeLabel(r) },
+      { key: 'summary', label: 'Request' },
+      { key: 'status', label: 'Status', render: (r) => badge(r.status) },
+      { key: 'file_count', label: 'Files', render: (r) => (r.file_count ? String(r.file_count) : '-') },
+      { key: 'actions', label: 'Actions', render: (r) => button(t('Review'), { small: true, class: 'review', on: { click: () => openReview(ctx, r.request_id, () => lp.reload()) } }) }
+    ],
+    empty: t('No requests match.'),
+    auto: 30000, // ← 30 ثانية دايماً عشان الريكويستات تظهر فوراً
+
+    async load(f, page) {
+      const res = await ctx.api.call('getRequests', { ...clean(f), page, page_size: 50 });
+
+      // لو فيه pending — اعرض badge تنبيه
+      pendingCount = res.open_count || 0;
+      const pendingBadge = pendingCount > 0
+        ? h('span', { style: 'background:#FF5900;color:#fff;border-radius:999px;padding:2px 10px;font-size:.8rem;font-weight:700;margin-inline-start:8px' }, `${pendingCount} ${t('pending')}`)
+        : null;
+
+      return {
+        items: res.items,
+        total: res.total,
+        page: res.page,
+        page_size: res.page_size,
+        before: h('p', { class: 'hint', id: 'open-count' },
+          t('{n} request(s) waiting for your decision.', { n: res.open_count }),
+          pendingBadge
+        )
+      };
+    }
   });
-  return { el: h('div', {}, h('h1', {}, t('Requests')), h('p', { class: 'hint' }, t('Swaps, leave, sick leave (with proof files) and early leave asked for by captains. Your approval is what changes the schedule; it overrides the Google roster for those days.')), lp.el), destroy: lp.stop };
+
+  return {
+    el: h('div', {},
+      h('h1', {}, t('Requests')),
+      h('p', { class: 'hint' }, t('Swaps, leave, sick leave (with proof files) and early leave asked for by captains. Your approval is what changes the schedule; it overrides the Google roster for those days.')),
+      h('p', { class: 'hint', style: 'color:var(--ok)' }, '🔄 ' + t('This page refreshes automatically every 30 seconds.')),
+      lp.el
+    ),
+    destroy: lp.stop
+  };
 }
