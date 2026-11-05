@@ -671,6 +671,13 @@ const AR = {
   'Test loud push for this captain': 'إرسال تجريبي قوي للكابتن ده'
 };
 
+// d92 — رسائل الشبكة بقت عربي (كانت بتظهر إنجليزي على واجهة عربية) + تشخيص أوضح لفشل اللوجين
+AR['Cannot reach the server. Check your connection and try again.'] = 'مقدرناش نوصل للسيرفر. اتأكد من اتصال الإنترنت وحاول تاني.';
+AR['The server is not responding correctly. Please try again shortly.'] = 'السيرفر رد برد مش متوقع — بنعيد المحاولة تلقائيًا. لو استمرت حاول تاني بعد لحظات.';
+AR['You are offline. Connect to the internet and try again.'] = 'أنت أوفلاين — وصّل النت وحاول تاني.';
+AR["The server is working — the problem is the phone's network. Switch between Wi-Fi and mobile data, or retry in a moment."] = 'السيرفر شغال تمام — المشكلة من شبكة الموبايل نفسها. بدّل بين الواي فاي وبيانات الموبايل أو حاول تاني بعد لحظات.';
+AR['Cannot reach Google servers from this network. Switch network and try again.'] = 'مش قادرين نوصل لسيرفرات جوجل من الشبكة دي. بدّل الشبكة (واي فاي / بيانات) وحاول تاني.';
+
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً
 try {
   const legacy = (globalThis.GOPS_ADMIN_I18N && globalThis.GOPS_ADMIN_I18N.ui) || {};

@@ -111,9 +111,21 @@ export function mountEmployeeApp(root, deps = {}) {
 
   function loginView() {
     const f = buildForm([{ name: 'employee_id', label: 'Employee ID', required: true, autocomplete: 'username', inputmode: 'text' }, { name: 'password', label: 'Password', type: 'password', required: true, autocomplete: 'current-password', trim: false },
-      { name: 'remember', label: 'Remember me on this device', type: 'checkbox' }], {}, { submitLabel: t('Sign in'), onSubmit: async (v) => { await api.login(v.employee_id, v.password, v.remember); notice = null; view(); } });
+      { name: 'remember', label: 'Remember me on this device', type: 'checkbox' }], {}, { submitLabel: t('Sign in'), onSubmit: async (v) => {
+      // d92: تشخيص فشل الشبكة — بعد المحاولات التلقائية بنفحص السيرفر نفسه: لو واصل يبقى المشكلة من شبكة الموبايل مش من السيرفر
+      try { await api.login(v.employee_id, v.password, v.remember); notice = null; view(); }
+      catch (e) {
+        if (['NETWORK_ERROR', 'OFFLINE', 'SERVER_UNAVAILABLE'].indexOf(e.code) >= 0) {
+          const p = await api.probeServer();
+          if (p && p.ok) throw Object.assign(new Error(t("The server is working — the problem is the phone's network. Switch between Wi-Fi and mobile data, or retry in a moment.")), { code: 'LOGIN_NET_DIAG' });
+          throw Object.assign(new Error(t('Cannot reach Google servers from this network. Switch network and try again.')), { code: 'LOGIN_NET_DIAG' });
+        }
+        throw e;
+      }
+    } });
     mount(body, h('section', { class: 'card login' }, h('h1', {}, t('Sign in')), notice ? h('div', { class: 'alert alert-warn', id: 'login-notice' }, notice) : null, f.el,
-      h('p', { class: 'hint' }, t('Your Employee ID and password are provided by your administrator.'))));
+      h('p', { class: 'hint' }, t('Your Employee ID and password are provided by your administrator.')),
+      h('p', { class: 'hint', id: 'login-ver', style: 'margin-top:8px;font-size:11px;opacity:.7' }, (t('App version') || 'App version') + ': ' + (cfg().APP_VER || '?'))));
   }
   function changePasswordView() {
     const f = buildForm([{ name: 'current', label: 'Current (temporary) password', type: 'password', required: true, autocomplete: 'current-password', trim: false }, { name: 'next', label: 'New password', type: 'password', required: true, autocomplete: 'new-password', trim: false, hint: 'At least 8 characters with letters and digits.' },

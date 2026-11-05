@@ -5,6 +5,7 @@
  */
 window.GOPS_CONFIG = Object.freeze({
   APP_NAME: 'Ground OPS Tracker',
+  APP_VER: 'd92', // d92: retry للوجين + فحص تشخيصي + الإصدار ظاهر على شاشة الدخول
   API_URL: 'https://script.google.com/macros/s/AKfycbySC6sQTg586OX9JTwO2FaLQEdVhkY_c1iWnkadadx9TLE2-tQl1x8Ccu1F48j0JVWj/exec', // Apps Script Web App URL (ends with /exec)
   DEFAULT_TIMEZONE: 'Africa/Cairo',
   DEFAULT_GEOFENCE_RADIUS: 300,      // meters

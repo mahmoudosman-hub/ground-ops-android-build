@@ -17,6 +17,6 @@ const MAP = {
 };
 export function errorMessage(e) {
   if (!e) return t('Something went wrong.');
-  if (['VALIDATION_ERROR', 'INVALID_ASSIGNMENT', 'WEAK_PASSWORD', 'REQUEST_CONFLICT', 'REQUEST_TOO_LATE', 'LEAVE_BALANCE_EXCEEDED', 'LEAVE_WEEK_LIMIT', 'FILE_REQUIRED', 'TOO_MANY_FILES', 'INVALID_FILE'].includes(e.code)) return e.message || t('Invalid input.'); // the server message is specific (dates, counts) and already clear
+  if (['VALIDATION_ERROR', 'LOGIN_NET_DIAG', 'INVALID_ASSIGNMENT', 'WEAK_PASSWORD', 'REQUEST_CONFLICT', 'REQUEST_TOO_LATE', 'LEAVE_BALANCE_EXCEEDED', 'LEAVE_WEEK_LIMIT', 'FILE_REQUIRED', 'TOO_MANY_FILES', 'INVALID_FILE'].includes(e.code)) return e.message || t('Invalid input.'); // the server message is specific (dates, counts) and already clear
   return MAP[e.code] ? t(MAP[e.code]) : (e.message || t('Something went wrong.'));
 }
