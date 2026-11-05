@@ -14,13 +14,56 @@ export async function showSelfie(ctx, attendanceId, which = 'check_in') {
 
 export async function attendancePage(ctx) {
   const l = await ctx.lookups.load(), today = todayLocal(), can = (p) => ctx.user.permissions.includes(p);
+
+  // ── d84: تصفير علامات الحضور + الحضور اليدوي (S29) ──────────────
+  function resetModal(r, lp) {
+    const m = openModal({ title: t('Reset attendance marks'), body: null });
+    const f = buildForm([
+      { name: 'reset_late', label: t('Late arrival'), type: 'checkbox' },
+      { name: 'reset_early_out', label: t('Early check-out'), type: 'checkbox' },
+      { name: 'reset_flags', label: t('Notes / flags'), type: 'checkbox' }
+    ], { reset_late: r.attendance_status === 'LATE' || (r.late_minutes || 0) > 0, reset_early_out: !!r.early_checkout_minutes }, {
+      submitLabel: t('Reset selected'), cancel: () => m.close(),
+      onSubmit: async (v) => {
+        try {
+          await ctx.api.call('resetAttendanceMarks', { mode: 'RESET', attendance_id: r.attendance_id, reset_late: !!v.reset_late, reset_early_out: !!v.reset_early_out, reset_flags: !!v.reset_flags });
+          m.close(); toast(t('Attendance updated'), 'ok'); lp.reload();
+        } catch (e) { toastError(e); }
+      }
+    });
+    m.setBody(h('div', {}, h('p', { class: 'hint' }, t('Choose what to clear for this attendance record. Reports update immediately.')), f.el));
+  }
+
+  function manualModal(lp) {
+    const m = openModal({ title: t('Manual check-in'), body: null });
+    const f = buildForm([
+      { name: 'employee_id', label: 'Employee', type: 'select', required: true, options: ctx.lookups.employeeOpts(l, t('Select employee...')) },
+      { name: 'work_date', label: 'Date', type: 'date', required: true, value: today }
+    ], {}, {
+      submitLabel: t('Register check-in'), cancel: () => m.close(),
+      onSubmit: async (v) => {
+        try {
+          await ctx.api.call('resetAttendanceMarks', { mode: 'MANUAL_CHECKIN', employee_id: v.employee_id, work_date: v.work_date });
+          m.close(); toast(t('Manual check-in registered'), 'ok'); lp.reload();
+        } catch (e) { toastError(e); }
+      }
+    });
+    m.setBody(h('div', {}, h('p', { class: 'hint' }, t('Creates an attendance record for a day the captain could not check in (marked as MANUAL).')), f.el));
+  }
+
+  const attCols = [
+    { key: 'work_date', label: 'Date' }, { key: 'employee_id', label: 'Employee', render: (r) => h('a', { href: `#/employee?id=${r.employee_id}&date=${r.work_date}` }, `${r.employee_id} ${(l.employees.find((e) => e.employee_id === r.employee_id) || {}).employee_name || ''}`) },
+    { key: 'check_in_time', label: 'Check-in', render: (r) => fmtTime(r.check_in_time) }, { key: 'check_out_time', label: 'Check-out', render: (r) => fmtTime(r.check_out_time) }, { key: 'attendance_status', label: 'Status', render: (r) => h('span', { class: 'badges' }, badge(r.attendance_status, r.attendance_status === 'LATE' ? `Late ${r.late_minutes} min` : undefined), (r.flags || []).map((f) => badge(f))) },
+    { key: 'check_in_distance_meters', label: 'Check-in distance', render: (r) => (r.check_in_distance_meters != null ? `${Math.round(r.check_in_distance_meters)} m` : '-') }, { key: 'early_checkout_minutes', label: 'Early out', render: (r) => (r.early_checkout_minutes ? minutesText(r.early_checkout_minutes) : '-') },
+    { key: 'selfie', label: 'Selfie', render: (r) => (can('view_selfies') && (r.selfie_available || r.checkout_selfie_available) ? h('span', { class: 'btn-row' }, r.selfie_available ? button(t('View'), { small: true, on: { click: () => showSelfie(ctx, r.attendance_id) } }) : null, r.checkout_selfie_available ? button(t('View check-out'), { small: true, on: { click: () => showSelfie(ctx, r.attendance_id, 'check_out') } }) : null) : '-') }
+  ];
+  if (can('view_attendance')) attCols.push({ key: 'actions', label: 'Actions', render: (r) => button(t('Reset'), { small: true, id: `btn-reset-${r.attendance_id}`, on: { click: () => resetModal(r, lp) } }) });
+
   const lp = listPage({
     filters: [{ name: 'date_from', label: 'From', type: 'date', value: today }, { name: 'date_to', label: 'To', type: 'date', value: today }, { name: 'employee_id', label: 'Employee', type: 'select', options: ctx.lookups.employeeOpts(l) }, { name: 'branch_id', label: 'Branch', type: 'select', options: ctx.lookups.branchOpts(l) },
       { name: 'status', label: 'Status', type: 'select', options: ATT_STATUS.map((s) => opt(s, s ? s.replace(/_/g, ' ') : t('All'))) }],
-    columns: [{ key: 'work_date', label: 'Date' }, { key: 'employee_id', label: 'Employee', render: (r) => h('a', { href: `#/employee?id=${r.employee_id}&date=${r.work_date}` }, `${r.employee_id} ${(l.employees.find((e) => e.employee_id === r.employee_id) || {}).employee_name || ''}`) },
-      { key: 'check_in_time', label: 'Check-in', render: (r) => fmtTime(r.check_in_time) }, { key: 'check_out_time', label: 'Check-out', render: (r) => fmtTime(r.check_out_time) }, { key: 'attendance_status', label: 'Status', render: (r) => h('span', { class: 'badges' }, badge(r.attendance_status, r.attendance_status === 'LATE' ? `Late ${r.late_minutes} min` : undefined), (r.flags || []).map((f) => badge(f))) },
-      { key: 'check_in_distance_meters', label: 'Check-in distance', render: (r) => (r.check_in_distance_meters != null ? `${Math.round(r.check_in_distance_meters)} m` : '-') }, { key: 'early_checkout_minutes', label: 'Early out', render: (r) => (r.early_checkout_minutes ? minutesText(r.early_checkout_minutes) : '-') },
-      { key: 'selfie', label: 'Selfie', render: (r) => (can('view_selfies') && (r.selfie_available || r.checkout_selfie_available) ? h('span', { class: 'btn-row' }, r.selfie_available ? button(t('View'), { small: true, on: { click: () => showSelfie(ctx, r.attendance_id) } }) : null, r.checkout_selfie_available ? button(t('View check-out'), { small: true, on: { click: () => showSelfie(ctx, r.attendance_id, 'check_out') } }) : null) : '-') }],
+    toolbar: can('view_attendance') ? button(t('Manual check-in'), { kind: 'primary', id: 'btn-manual-checkin', on: { click: () => manualModal(lp) } }) : undefined,
+    columns: attCols,
     async load(f, page) { const res = await ctx.api.call('getAttendance', { ...clean(f), page, page_size: 50 }); return { items: res.items, total: res.total, page: res.page, page_size: res.page_size }; }
   });
   return { el: h('div', {}, h('h1', {}, t('Attendance')), lp.el) };

@@ -579,7 +579,46 @@ const AR = {
   'GPS stale (minutes)': 'GPS دقائق بدون تحديث',
 
   // ---------- d83: tooltip إصدار التطبيق ----------
-  'App version': 'إصدار التطبيق'
+  'App version': 'إصدار التطبيق',
+
+  // ---------- d84: الحزمة الأربعة (S29) ----------
+  '📱 iOS tracking link gate': '📱 بوابة لينك المتابعة للآيفون',
+  'When enabled, iPhone captains must paste a Google Maps live location link before they can check in. The selfie stays required as usual. Android and web are not affected.': 'لما تتشغل، كباتن الآيفون لازم يلصقوا لينك مشاركة الموقع المباشر من خرائط جوجل قبل تسجيل الحضور. السيلفي بتفضل إجبارية زي ما هي. الأندرويد والويب مش متأثرين.',
+  'Required before check-in:': 'إجباري قبل الحضور:',
+  'Tip: enable it after the captains have the updated app, otherwise their check-in will be rejected until they refresh the page.': 'نصيحة: فعّلها بعد ما أجهزة الكباتن تاخد التحديث — لو فعّلتها بدري، طلب الحضور هيرفض لحد ما يحدّثوا الصفحة.',
+  'Reset attendance marks': 'تصفير علامات الحضور',
+  'Late arrival': 'التأخير',
+  'Early check-out': 'الخروج المبكر',
+  'Notes / flags': 'الملاحظات والأعلام',
+  'Reset selected': 'تصفير المختار',
+  'Reset': 'تصفير',
+  'Choose what to clear for this attendance record. Reports update immediately.': 'اختار اللي عايز تمسحه من سجل الحضور ده — التقارير بتتحدث فورًا.',
+  'Attendance updated': 'سجل الحضور اتحدث ✅',
+  'Manual check-in': 'تسجيل حضور يدوي',
+  'Register check-in': 'تسجيل الحضور',
+  'Creates an attendance record for a day the captain could not check in (marked as MANUAL).': 'بيعمل سجل حضور ليوم ماقدرش الكابتن يسجل فيه (متعلّم كـ MANUAL).',
+  'Manual check-in registered': 'الحضور اليدوي اتسجل ✅',
+  'Ready Messages': 'الرسائل الجاهزة',
+  'Save message templates and send them to captains as an in-app notification with an instant push.': 'احفظ رسائل جاهزة وابعتها للكباتن كإشعار داخل التطبيق مع إشعار فوري على الجهاز.',
+  'New template': 'رسالة جديدة',
+  'Edit template': 'تعديل الرسالة',
+  'Template title': 'عنوان الرسالة',
+  'Message body': 'نص الرسالة',
+  'Template saved': 'الرسالة اتحفظت ✅',
+  'Template deleted': 'الرسالة اتشالت ✅',
+  'Delete template?': 'تحذف الرسالة دي؟',
+  'Send to:': 'الإرسال إلى:',
+  'All active captains': 'كل الكباتن النشطين',
+  'Specific captain': 'كابتن محدد',
+  'Send "{t}" as a notification + push?': 'تبعت «{t}» كإشعار داخل التطبيق + إشعار فوري؟',
+  'Message sent to {n} captain(s)': 'الرسالة وصلت لـ {n} كابتن',
+  'No templates yet. Add your first one.': 'مفيش رسائل محفوظة لسه — ضيف أول رسالة.',
+  'Before checking in: share your live location': 'قبل تسجيل الحضور: شارك موقعك المباشر',
+  'Open Google Maps > tap your profile icon > Location sharing > share your live location, copy the link, and paste it here. The admin will watch it live until your shift ends.': 'افتح خرائط جوجل > دوس على صورة حسابك > مشاركة الموقع > شارك موقعك المباشر، انسخ اللينك والصقه هنا. الإدارة هتشوف موقعك live لحد نهاية الشيفت.',
+  'Continue: tracking link': 'متابعة: لينك المتابعة',
+  'Invalid link': 'اللينك مش صحيح',
+  'Paste the live location sharing link from Google Maps (it starts with maps.app.goo.gl or google.com/maps).': 'الصق لينك مشاركة الموقع المباشر من خرائط جوجل (بيبدأ بـ maps.app.goo.gl أو google.com/maps).',
+  'Tracking link required': 'لينك المتابعة مطلوب'
 };
 
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً

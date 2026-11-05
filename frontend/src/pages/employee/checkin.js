@@ -7,6 +7,8 @@ import { openModal, button, spinner } from '../../components/ui.js';
 import { startCamera, stopCamera, captureToJpeg, fileToImage, CameraError } from '../../services/camera.js';
 
 const isOnline = () => !(globalThis.navigator && globalThis.navigator.onLine === false);
+const isIosDevice = () => /iPad|iPhone|iPod/.test((globalThis.navigator && globalThis.navigator.userAgent) || '') || ((globalThis.navigator && globalThis.navigator.platform) === 'MacIntel' && (globalThis.navigator && globalThis.navigator.maxTouchPoints) > 1);
+const GMAPS_LINK_RE = /^https:\/\/(maps\.google\.com|www\.google\.com\/maps|maps\.app\.goo\.gl)/;
 const LOC_HELP = {
   PERMISSION_DENIED: 'Location permission is blocked. Allow location for this app in your browser/phone settings (Android: lock icon > Permissions; iPhone: Settings > Privacy > Location Services > Safari Websites), then tap Retry.',
   GPS_DISABLED: 'Your location is unavailable. Turn on GPS / Location Services and make sure you have a signal, then tap Retry.',
@@ -24,10 +26,29 @@ async function freshFix(provider, previous) {
 export function openCheckIn({ api, provider, schedule, onDone }) {
   const branch = schedule.assignment.branch, radius = branch.geofence_radius_meters, s = schedule.settings || {};
   const needSelfie = s.selfie_required !== false, maxBytes = s.selfie_max_bytes || 600000, maxAcc = s.gps_accuracy_threshold_meters || 50;
+  // d84: بوابة لينك المتابعة للآيفون (ios_track_link_required من إعدادات السيرفر)
+  const needTrack = !!(s.ios_track_link_required === true || s.ios_track_link_required === 'TRUE');
+  let trackLink = '';
   let stream = null, fix = null, photo = null, modal;
   const cleanup = () => { stopCamera(stream); stream = null; };
   const fail = (title, msg, extra, retry) => modal.setBody(h('div', { class: 'alert alert-bad', role: 'alert' }, h('strong', {}, title), h('p', {}, msg)), extra || null,
     h('div', { class: 'form-actions' }, button(t('Close'), { on: { click: () => modal.close() } }), retry ? button(t('Retry'), { kind: 'primary', on: { click: retry } }) : null));
+
+  function stepTrackLink() {
+    const input = h('input', { type: 'url', inputmode: 'url', placeholder: 'https://maps.app.goo.gl/...', value: trackLink, style: 'width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:1rem;background:var(--bg);color:var(--text)' });
+    modal.setBody(
+      h('div', { class: 'alert alert-warn' }, t('Before checking in: share your live location')),
+      h('p', { class: 'hint' }, t('Open Google Maps > tap your profile icon > Location sharing > share your live location, copy the link, and paste it here. The admin will watch it live until your shift ends.')),
+      input,
+      h('div', { class: 'form-actions' }, button(t('Back'), { on: { click: () => { cleanup(); stepLocation(); } } }),
+        button(needSelfie ? t('Continue to selfie') : t('Check in now'), { kind: 'primary', big: true, id: 'btn-track-continue', on: { click: () => {
+          const v = (input.value || '').trim();
+          if (!GMAPS_LINK_RE.test(v)) return fail(t('Invalid link'), t('Paste the live location sharing link from Google Maps (it starts with maps.app.goo.gl or google.com/maps).'), null, stepTrackLink);
+          trackLink = v;
+          if (needSelfie) stepCamera(); else submit();
+        } } }))
+    );
+  }
 
   async function stepLocation() {
     cleanup(); modal.setBody(spinner(t('Getting your location...')));
@@ -41,7 +62,8 @@ export function openCheckIn({ api, provider, schedule, onDone }) {
     if (fix.accuracy > maxAcc) return fail(t('GPS accuracy is too low'), t('Accuracy is {a} m but {m} m or better is required. Move to an open area and retry.', { a: Math.round(fix.accuracy), m: maxAcc }), rows, stepLocation);
     if (dist > radius) return fail(t('You are outside the assigned branch.'), '', rows, stepLocation);
     modal.setBody(h('div', { class: 'alert alert-ok' }, '✔ ', t('You are inside the branch area.')), rows,
-      h('div', { class: 'form-actions' }, button(t('Cancel'), { on: { click: () => modal.close() } }), button(needSelfie ? t('Continue to selfie') : t('Check in now'), { kind: 'primary', big: true, id: 'btn-continue', on: { click: needSelfie ? stepCamera : submit } })));
+      h('div', { class: 'form-actions' }, button(t('Cancel'), { on: { click: () => modal.close() } }),
+        button(needTrack ? t('Continue: tracking link') : (needSelfie ? t('Continue to selfie') : t('Check in now')), { kind: 'primary', big: true, id: 'btn-continue', on: { click: needTrack ? stepTrackLink : (needSelfie ? stepCamera : submit) } })));
   }
 
   async function stepCamera() {
@@ -67,7 +89,7 @@ export function openCheckIn({ api, provider, schedule, onDone }) {
     modal.setBody(spinner(t('Checking in...')));
     try {
       fix = await freshFix(provider, fix);
-      const res = await api.call('checkIn', { ...fixPayload(fix), ...(photo ? { selfie_base64: photo.base64, selfie_mime: photo.mime } : {}) });
+      const res = await api.call('checkIn', { ...fixPayload(fix), ...(photo ? { selfie_base64: photo.base64, selfie_mime: photo.mime } : {}), ...(trackLink ? { platform: 'ios', gmaps_link: trackLink } : {}) });
       cleanup();
       const late = res.attendance_status === 'LATE';
       modal.setBody(h('div', { class: `alert ${late ? 'alert-warn' : 'alert-ok'}`, id: 'checkin-result' }, h('strong', {}, late ? t('Checked in - late by {n} minutes', { n: res.late_minutes }) : t('Checked in - on time')),
@@ -76,6 +98,7 @@ export function openCheckIn({ api, provider, schedule, onDone }) {
       if (e.code === 'OUTSIDE_GEOFENCE') { const d = e.details || {}; return fail(t('You are outside the assigned branch.'), '', infoRows([['Current distance', `${Math.round(d.distance_meters)} meters`], ['Required', `Within ${d.required_within_meters} meters`]]), stepLocation); }
       if (['STALE_LOCATION', 'LOW_ACCURACY', 'GPS_UNAVAILABLE'].includes(e.code)) return fail(t('Location problem'), errorMessage(e), null, stepLocation);
       if (e.state) return fail(t('Location problem'), t(LOC_HELP[e.state] || LOC_HELP.UNAVAILABLE), null, submit);
+      if (['TRACKING_LINK_REQUIRED', 'INVALID_TRACK_LINK'].includes(e.code)) return fail(t('Tracking link required'), errorMessage(e), null, stepTrackLink);
       if (['OFFLINE', 'NETWORK_ERROR', 'SERVER_UNAVAILABLE'].includes(e.code)) return fail(t('Not checked in'), t('{m} Nothing was recorded. Please try again.', { m: errorMessage(e) }), null, submit);
       fail(t('Check-in failed'), errorMessage(e), null, ['DUPLICATE_CHECKIN', 'NO_ASSIGNMENT', 'ON_LEAVE', 'CHECKIN_WINDOW_CLOSED'].includes(e.code) ? null : submit);
     }

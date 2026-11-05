@@ -88,6 +88,39 @@ export async function settingsPage(ctx) {
     } catch (e) { lateCard.replaceChildren(errorBox(e)); }
   }
 
+  // ── iOS tracking link gate card (d84) ─────────────────────────────
+  const iosCard = h('section', { class: 'card', id: 'ios-gate-card' });
+
+  async function loadIosGate() {
+    if (!can) return;
+    try {
+      const { settings } = await ctx.api.call('getSettings', {});
+      const row = (settings || []).find((x) => x.key === 'ios_track_link_required');
+      const on = !!(row && (row.value === true || String(row.value).toUpperCase() === 'TRUE'));
+      const input = h('input', { type: 'checkbox', checked: on, style: 'width:20px;height:20px;accent-color:#C62828' });
+      iosCard.replaceChildren(
+        h('h2', {}, t('📱 iOS tracking link gate')),
+        h('p', { class: 'hint' }, t('When enabled, iPhone captains must paste a Google Maps live location link before they can check in. The selfie stays required as usual. Android and web are not affected.')),
+        h('div', { style: 'display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap' },
+          h('span', { style: 'font-weight:600' }, t('Required before check-in:')),
+          input,
+          button(t('Save'), {
+            kind: 'primary', small: true,
+            on: {
+              click: async () => {
+                try {
+                  await ctx.api.call('updateSettings', { settings: { ios_track_link_required: input.checked } });
+                  toast(t('Saved ✅'), 'ok');
+                } catch (e) { toastError(e); }
+              }
+            }
+          })
+        ),
+        h('p', { class: 'hint', style: 'margin-top:8px' }, t('Tip: enable it after the captains have the updated app, otherwise their check-in will be rejected until they refresh the page.'))
+      );
+    } catch (e) { iosCard.replaceChildren(errorBox(e)); }
+  }
+
   // ── KPI Configuration card (تصميم جديد - بطاقات) ─────────────────
   const kpiCard = h('section', { class: 'card', id: 'kpi-card' });
 
@@ -239,7 +272,7 @@ export async function settingsPage(ctx) {
     } catch (e) { kpiCard.replaceChildren(errorBox(e)); }
   }
 
-  load(); loadArchive(); loadKpi(); loadLatePermission();
+  load(); loadArchive(); loadKpi(); loadLatePermission(); loadIosGate();
 
   return {
     el: h('div', {},
@@ -247,6 +280,7 @@ export async function settingsPage(ctx) {
       box,
       arch,
       lateCard,
+      iosCard,
       kpiCard
     )
   };
