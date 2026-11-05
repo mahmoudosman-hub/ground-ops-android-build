@@ -589,6 +589,7 @@ const AR = {
   'Reset attendance marks': 'تصفير علامات الحضور',
   'Late arrival': 'التأخير',
   'Early check-out': 'الخروج المبكر',
+  'Early leave (approved)': 'إيرلى ليف معتمد',
   'Notes / flags': 'الملاحظات والأعلام',
   'Reset selected': 'تصفير المختار',
   'Reset': 'تصفير',
