@@ -121,6 +121,104 @@ export async function settingsPage(ctx) {
     } catch (e) { iosCard.replaceChildren(errorBox(e)); }
   }
 
+  // ── iPhone push (ntfy) card (d86) ─────────────────────────────────
+  const ntfyCard = h('section', { class: 'card', id: 'ntfy-card' });
+
+  async function loadNtfy() {
+    if (!can) return;
+    try {
+      const st = await ctx.api.call('ntfyGetSettings', {});
+      const on = !!st.enabled;
+      const stats = st.stats || {};
+      const statLine = (stats.ok || stats.fail)
+        ? t('Sent OK: {a} / Failed: {b}', { a: stats.ok || 0, b: stats.fail || 0 })
+        : t('No pushes sent yet.');
+
+      const enInput = h('input', { type: 'checkbox', checked: on, style: 'width:20px;height:20px;accent-color:#C62828' });
+      const topicInput = h('input', {
+        type: 'text', value: st.topic || '', maxlength: 64, spellcheck: 'false', dir: 'ltr',
+        placeholder: 'ground-ops-alerts-7x3k',
+        style: 'flex:1;min-width:200px;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:1rem;background:var(--bg);color:var(--text);font-family:monospace'
+      });
+
+      const saveBtn = button(t('Save'), {
+        kind: 'primary', small: true,
+        on: {
+          click: async () => {
+            const topic = String(topicInput.value || '').trim();
+            if (!/^[A-Za-z0-9_-]{4,64}$/.test(topic)) { toast(t('Topic: letters, digits, _ and - (4-64 chars)'), 'warn'); return; }
+            try {
+              await ctx.api.call('ntfySaveSettings', { enabled: enInput.checked, topic });
+              toast(t('ntfy settings saved'), 'ok'); loadNtfy();
+            } catch (e) { toastError(e); }
+          }
+        }
+      });
+
+      const testBtn = button(t('Test push'), {
+        small: true,
+        on: {
+          click: async () => {
+            try {
+              await ctx.api.call('ntfyTest', {});
+              toast(t('Test push sent — check your iPhone lock screen'), 'ok');
+              loadNtfy();
+            } catch (e) { toastError(e); }
+          }
+        }
+      });
+
+      const mTitle = h('input', { type: 'text', maxlength: 120, placeholder: t('Title'), style: 'width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:.95rem;background:var(--bg);color:var(--text)' });
+      const mBody = h('textarea', { maxlength: 900, rows: 3, placeholder: t('Message'), style: 'width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:.95rem;background:var(--bg);color:var(--text);resize:vertical' });
+      const mPri = h('select', { style: 'padding:8px;border:1px solid var(--line);border-radius:8px;font-size:.95rem;background:var(--bg);color:var(--text)' },
+        h('option', { value: 'high' }, t('High')),
+        h('option', { value: 'max' }, t('Max (urgent)')),
+        h('option', { value: 'default' }, t('Normal'))
+      );
+      const sendBtn = button(t('Send'), {
+        kind: 'primary', small: true,
+        on: {
+          click: async () => {
+            const title = String(mTitle.value || '').trim(), message = String(mBody.value || '').trim();
+            if (!title || !message) { toast(t('Title and message are required'), 'warn'); return; }
+            try {
+              await ctx.api.call('ntfySendManual', { title, message, priority: mPri.value });
+              toast(t('Manual push sent'), 'ok');
+              mTitle.value = ''; mBody.value = '';
+              loadNtfy();
+            } catch (e) { toastError(e); }
+          }
+        }
+      });
+
+      ntfyCard.replaceChildren(
+        h('h2', {}, t('📱 iPhone push (ntfy)')),
+        h('p', { class: 'hint' }, t('When location tracking stops for a captain on shift, a loud push arrives on your iPhone via the free ntfy app — even when the app is fully closed.')),
+        h('p', { class: 'hint' }, statLine),
+        h('div', { style: 'display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap' },
+          h('span', { style: 'font-weight:600' }, t('Enabled:')),
+          enInput,
+          topicInput,
+          saveBtn,
+          testBtn
+        ),
+        h('p', { class: 'hint', style: 'margin-top:8px' }, t('The topic name is the protection — anyone who knows it can send to your channel. Use a long name that is hard to guess.')),
+        h('p', { class: 'hint' }, t('iPhone steps: install the free ntfy app, add a subscription with the topic above, then press Test push while the screen is locked.')),
+        h('h3', { style: 'margin-top:14px' }, t('Manual send')),
+        h('div', { style: 'display:grid;gap:8px;max-width:520px' },
+          mTitle, mBody,
+          h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, mPri, sendBtn)
+        )
+      );
+    } catch (e) {
+      ntfyCard.replaceChildren(
+        h('h2', {}, t('📱 iPhone push (ntfy)')),
+        h('p', { class: 'hint' }, t('ntfy status unavailable (server patch not installed yet).')),
+        errorBox(e)
+      );
+    }
+  }
+
   // ── KPI Configuration card (تصميم جديد - بطاقات) ─────────────────
   const kpiCard = h('section', { class: 'card', id: 'kpi-card' });
 
@@ -272,7 +370,7 @@ export async function settingsPage(ctx) {
     } catch (e) { kpiCard.replaceChildren(errorBox(e)); }
   }
 
-  load(); loadArchive(); loadKpi(); loadLatePermission(); loadIosGate();
+  load(); loadArchive(); loadKpi(); loadLatePermission(); loadIosGate(); loadNtfy();
 
   return {
     el: h('div', {},
@@ -281,6 +379,7 @@ export async function settingsPage(ctx) {
       arch,
       lateCard,
       iosCard,
+      ntfyCard,
       kpiCard
     )
   };

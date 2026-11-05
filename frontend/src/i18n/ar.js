@@ -619,7 +619,29 @@ const AR = {
   'Continue: tracking link': 'متابعة: لينك المتابعة',
   'Invalid link': 'اللينك مش صحيح',
   'Paste the live location sharing link from Google Maps (it starts with maps.app.goo.gl or google.com/maps).': 'الصق لينك مشاركة الموقع المباشر من خرائط جوجل (بيبدأ بـ maps.app.goo.gl أو google.com/maps).',
-  'Tracking link required': 'لينك المتابعة مطلوب'
+  'Tracking link required': 'لينك المتابعة مطلوب',
+
+  // ---------- إشعارات الآيفون ntfy (d86) ----------
+  '📱 iPhone push (ntfy)': '📱 إشعارات الآيفون (ntfy)',
+  'When location tracking stops for a captain on shift, a loud push arrives on your iPhone via the free ntfy app — even when the app is fully closed.': 'لما بث الموقع يقف لأي كابتن على الشيفت، توصلك زقّة قوية على آيفونك عبر تطبيق ntfy المجاني — حتى لو التطبيق مقفول تماماً.',
+  'Enabled:': 'مفعّل:',
+  'Topic: letters, digits, _ and - (4-64 chars)': 'اسم القناة: حروف إنجليزي وأرقام و _ و - (من 4 لـ 64 حرف)',
+  'ntfy settings saved': 'إعدادات ntfy اتحفظت',
+  'Test push': 'إرسال تجريبي',
+  'Test push sent — check your iPhone lock screen': 'الإشعار التجريبي اتبعت — بص على شاشة قفل الآيفون',
+  'Manual send': 'إرسال يدوي',
+  'Title': 'العنوان',
+  'Message': 'الرسالة',
+  'High': 'عالية',
+  'Max (urgent)': 'القصوى (طارئ)',
+  'Normal': 'عادية',
+  'Manual push sent': 'الإشعار اليدوي اتبعت',
+  'Title and message are required': 'العنوان والرسالة مطلوبين',
+  'Sent OK: {a} / Failed: {b}': 'نجحت: {a} / فشلت: {b}',
+  'No pushes sent yet.': 'لسه مفيش إشعارات اتبعتت.',
+  'The topic name is the protection — anyone who knows it can send to your channel. Use a long name that is hard to guess.': 'اسم القناة هو الحماية — أي حد يعرفه يقدر يبعت على قناتك. استخدم اسم طويل صعب التخمين.',
+  'iPhone steps: install the free ntfy app, add a subscription with the topic above, then press Test push while the screen is locked.': 'خطوات الآيفون: ثبّت تطبيق ntfy المجاني، اعمل اشتراك جديد باسم القناة اللي فوق، وبعدين دوس «إرسال تجريبي» وإنت مقفل الشاشة.',
+  'ntfy status unavailable (server patch not installed yet).': 'حالة ntfy مش متاحة (باتش السيرفر لسه منزلش).'
 };
 
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً
