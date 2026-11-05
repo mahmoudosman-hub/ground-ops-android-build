@@ -678,6 +678,11 @@ AR['You are offline. Connect to the internet and try again.'] = 'أنت أوفل
 AR["The server is working — the problem is the phone's network. Switch between Wi-Fi and mobile data, or retry in a moment."] = 'السيرفر شغال تمام — المشكلة من شبكة الموبايل نفسها. بدّل بين الواي فاي وبيانات الموبايل أو حاول تاني بعد لحظات.';
 AR['Cannot reach Google servers from this network. Switch network and try again.'] = 'مش قادرين نوصل لسيرفرات جوجل من الشبكة دي. بدّل الشبكة (واي فاي / بيانات) وحاول تاني.';
 
+// d93 — تشخيص أدق + الحل العملي (قفل/فتح النت هو اللي بيحل فعلاً حسب بلاغ الكباتن)
+AR['The server is working — we switched to a working connection. Try again in a moment.'] = 'السيرفر شغال تمام — حوّلنا الاتصال على رابط شغال تلقائيًا. حاول تاني بعد لحظات.';
+AR['Internet works, but the mobile network cannot reach Google servers right now. Turn mobile data OFF and ON (or airplane mode), then try again.'] = 'النت شغال بس شركة المحمول مش واصلة لسيرفرات جوجل دلوقتي. اقفل بيانات النت وافتحها تاني (أو فعّل وضع الطيران) وحاول — ده بيحل المشكلة فورًا.';
+AR['No internet on this phone right now. Reconnect and try again.'] = 'مفيش نت على الموبايل خالص دلوقتي. وصّل النت (أو بدّل واي فاي / بيانات) وحاول تاني.';
+
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً
 try {
   const legacy = (globalThis.GOPS_ADMIN_I18N && globalThis.GOPS_ADMIN_I18N.ui) || {};

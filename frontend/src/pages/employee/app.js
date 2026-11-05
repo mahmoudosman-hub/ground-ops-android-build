@@ -112,13 +112,18 @@ export function mountEmployeeApp(root, deps = {}) {
   function loginView() {
     const f = buildForm([{ name: 'employee_id', label: 'Employee ID', required: true, autocomplete: 'username', inputmode: 'text' }, { name: 'password', label: 'Password', type: 'password', required: true, autocomplete: 'current-password', trim: false },
       { name: 'remember', label: 'Remember me on this device', type: 'checkbox' }], {}, { submitLabel: t('Sign in'), onSubmit: async (v) => {
-      // d92: تشخيص فشل الشبكة — بعد المحاولات التلقائية بنفحص السيرفر نفسه: لو واصل يبقى المشكلة من شبكة الموبايل مش من السيرفر
+      // d92: تشخيص فشل الشبكة + d93: تصنيف أدق (نت شغال؟ جوجل مقطوعة؟ في رابط بديل شغال؟) + محاولة أخيرة تلقائية على الرابط الشغال
       try { await api.login(v.employee_id, v.password, v.remember); notice = null; view(); }
       catch (e) {
         if (['NETWORK_ERROR', 'OFFLINE', 'SERVER_UNAVAILABLE'].indexOf(e.code) >= 0) {
-          const p = await api.probeServer();
-          if (p && p.ok) throw Object.assign(new Error(t("The server is working — the problem is the phone's network. Switch between Wi-Fi and mobile data, or retry in a moment.")), { code: 'LOGIN_NET_DIAG' });
-          throw Object.assign(new Error(t('Cannot reach Google servers from this network. Switch network and try again.')), { code: 'LOGIN_NET_DIAG' });
+          const p = await api.probeNetwork();
+          if (p && p.anyOk) {
+            // لقينا رابط شغال واتثبت — محاولة أخيرة بالرابط الجديد
+            try { await api.login(v.employee_id, v.password, v.remember); notice = null; view(); return; }
+            catch (e2) { throw Object.assign(new Error(t('The server is working — we switched to a working connection. Try again in a moment.')), { code: 'LOGIN_NET_DIAG' }); }
+          }
+          if (p && p.netOk) throw Object.assign(new Error(t('Internet works, but the mobile network cannot reach Google servers right now. Turn mobile data OFF and ON (or airplane mode), then try again.')), { code: 'LOGIN_NET_DIAG' });
+          throw Object.assign(new Error(t('No internet on this phone right now. Reconnect and try again.')), { code: 'LOGIN_NET_DIAG' });
         }
         throw e;
       }
