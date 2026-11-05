@@ -1,4 +1,4 @@
-/* Ground OPS Tracker service worker - FAST LOAD (build d93 — precache unified-d93: failover تلقائي للرابط البديل + تشخيص أدق للشبكة + retry للوجين) */
+/* Ground OPS Tracker service worker - FAST LOAD (build d94 — precache unified-d94: ايرلى ليف بعد منتصف الليل (يوم الشيفت الشغال تلقائي) + d93 failover + d92 retry للوجين) */
 importScripts('./precache-manifest.js');
 const CACHE = `gops-${self.GOPS_PRECACHE.version}`;
 const SHELL = self.GOPS_PRECACHE.files;

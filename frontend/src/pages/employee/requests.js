@@ -1,7 +1,7 @@
 /** Captain screens: "My schedule" and "Requests" (swaps, leave incl. sick with proof files, early leave). All rules are enforced by the server; this file only collects input and shows results. */
 import { h, mount } from '../../core/dom.js';
 import { t, getLang } from '../../core/i18n.js';
-import { fmtDate, fmtDateTime, todayLocal, addDays } from '../../core/time.js';
+import { fmtDate, fmtDateTime, fmtTime, todayLocal, addDays } from '../../core/time.js';
 import { errorMessage } from '../../core/errors.js';
 import { badge, button, buildForm, openModal, spinner, toast, toastError, emptyState, errorBox } from '../../components/ui.js';
 import { captureToJpeg, fileToImage } from '../../services/camera.js';
@@ -105,9 +105,27 @@ export function createRequestsView({ api, onChange }) {
     const sel = f.el.querySelector('[name=leave_type]'); sel.addEventListener('change', () => { box.hidden = sel.value !== 'SICK'; });
   }
   function early() {
-    formModal(t('Early leave'), [{ name: 'date_from', label: 'Date', type: 'date', required: true, value: todayLocal(), min: todayLocal() }, { name: 'time_value', label: 'I will leave at', type: 'time', required: true }, { name: 'note', label: 'Reason (optional)', type: 'textarea', max: 300 }],
-      h('p', { class: 'hint' }, t('If the admin approves, your shift ends at this time. If not, your shift stays as it is.')), null,
+    // d94: طلب الانصراف المبكر بعد منتصف الليل — الشيفت اللي لسه شغال يومه «أمس» مش «النهاردة».
+    // الفورم بيسمح باختيار أمس + بينده getTodaySchedule (نفس مصدر صفحة الهوم) عشان يحدد يوم الشيفت الشغال
+    // ونهايته الفعلية (بعد موافقات الإيرلى ليف) ويعرضها — نفس اللي السيرفر (S30) بيحسمه.
+    const today = todayLocal(), yest = addDays(today, -1);
+    const shiftHint = h('p', { class: 'hint', id: 'early-shift-hint' }, t('Checking your current shift...'));
+    const f = formModal(t('Early leave'), [{ name: 'date_from', label: 'Date', type: 'date', required: true, value: today, min: yest, max: today }, { name: 'time_value', label: 'I will leave at', type: 'time', required: true }, { name: 'note', label: 'Reason (optional)', type: 'textarea', max: 300 }],
+      h('div', {}, shiftHint, h('p', { class: 'hint' }, t('If the admin approves, your shift ends at this time. If not, your shift stays as it is.'))), null,
       async (v) => { await api.call('createRequest', { type: 'EARLY_LEAVE', date_from: v.date_from, time_value: v.time_value, note: v.note || undefined }); done(t('Request sent to the admin')); });
+    let touched = false;
+    const markTouched = () => { touched = true; };
+    f.inputs.date_from.addEventListener('input', markTouched); f.inputs.date_from.addEventListener('change', markTouched);
+    (async () => {
+      let c = null; try { c = await api.call('getTodaySchedule', {}); } catch (e) { c = null; }
+      const a = c && c.assignment;
+      const live = !!(c && a && a.work_date && (c.window_state === 'OPEN' || (c.attendance && c.attendance.state === 'CHECKED_IN')));
+      if (!live) { shiftHint.textContent = t('If the running shift started yesterday, choose yesterday as the date.'); return; }
+      const inp = f.inputs.date_from;
+      if (!touched && (inp.value === today || inp.value === yest)) { inp.value = a.work_date; shiftHint.textContent = t('Date set to the running shift day ({d}).', { d: fmtDate(a.work_date) }); }
+      else shiftHint.textContent = t('Running shift: {d} · from {s} to {e}', { d: fmtDate(a.work_date), s: fmtTime(a.scheduled_start), e: fmtTime(a.scheduled_end) });
+      shiftHint.textContent += ' · ' + t('The request must be at least 15 minutes before the shift end.');
+    })();
   }
   function continueSick(r) {
     const fileInput = h('input', { type: 'file', id: 'proof-files', accept: 'image/*,application/pdf', multiple: true }), progress = h('p', { class: 'hint', id: 'proof-progress' }), err = h('div', { class: 'form-error', hidden: true });
