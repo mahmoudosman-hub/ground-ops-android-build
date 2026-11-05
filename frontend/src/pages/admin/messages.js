@@ -1,4 +1,5 @@
-/** d84: الرسائل الجاهزة — حفظ تيمبلتس وإرسالها للكباتن كإشعار داخلي + Push (سيرفر S29). */
+/** d84: الرسائل الجاهزة — حفظ تيمبلتس وإرسالها للكباتن كإشعار داخلي + Push (سيرفر S29).
+ *  d87: زرار «⚡ زقّة قوية» — إرسال ntfy موجه لأولوية Max لقناة الكابتن الخاصة (سيرفر S32). */
 import { h } from '../../core/dom.js';
 import { t } from '../../core/i18n.js';
 import { button, openModal, buildForm, toast, toastError, confirmDialog, spinner, errorBox } from '../../components/ui.js';
@@ -22,6 +23,53 @@ export async function messagesPage(ctx) {
       }
     });
     m.setBody(f.el);
+  }
+
+  // d87: مودال «زقّة قوية» — ntfy لقناة الكابتن الخاصة (أولوية Max افتراضيًا)
+  async function zapModal(tpl, reload) {
+    let targets = null;
+    try {
+      const ul = await ctx.api.call('ntfyUserList', {});
+      targets = (ul.users || []).filter((u) => u.has_topic);
+    } catch (e) {
+      toastError(e); return;
+    }
+    if (!targets.length) { toast(t('No captain has a channel yet. Generate channels from the ntfy card in Settings.'), 'warn'); return; }
+    const m = openModal({ title: t('⚡ Loud push') + (tpl ? ': ' + tpl.title : ''), body: null });
+    const f = buildForm([
+      { name: 'target', label: t('Send to:'), type: 'select', required: true, options: [
+        { value: 'ALL', label: t('All captains with a channel') + ` (${targets.length})` },
+        ...targets.map((u) => ({ value: u.employee_id, label: `${u.employee_id} ${u.employee_name}` }))
+      ] },
+      { name: 'title', label: t('Title'), type: 'text', required: true, maxlength: 120 },
+      { name: 'message', label: t('Message'), type: 'textarea', required: true, maxlength: 900 },
+      { name: 'priority', label: t('Priority'), type: 'select', required: true, options: [
+        { value: 'max', label: t('Max (urgent)') },
+        { value: 'high', label: t('High') },
+        { value: 'default', label: t('Normal') }
+      ] }
+    ], {
+      target: 'ALL',
+      title: tpl ? tpl.title : '',
+      message: tpl ? tpl.body : '',
+      priority: 'max'
+    }, {
+      submitLabel: t('⚡ Loud push'), cancel: () => m.close(),
+      onSubmit: async (v) => {
+        if (!(await confirmDialog(t('Send this as a loud ntfy push (max priority)?')))) return;
+        try {
+          const r = await ctx.api.call('ntfyUserSend', {
+            target_all: v.target === 'ALL' || undefined,
+            employee_id: v.target === 'ALL' ? undefined : v.target,
+            title: v.title, message: v.message, priority: v.priority
+          });
+          m.close();
+          toast(t('Loud push sent: {a} ok / {b} failed', { a: r.sent, b: r.failed }), r.failed ? 'warn' : 'ok');
+          if (reload) reload();
+        } catch (e) { toastError(e); }
+      }
+    });
+    m.setBody(h('div', {}, tpl ? h('p', { class: 'hint' }, tpl.body) : null, f.el));
   }
 
   function sendModal(tpl, reload) {
@@ -58,6 +106,7 @@ export async function messagesPage(ctx) {
           h('strong', { style: 'font-size:1.05rem' }, tpl.title),
           h('span', { style: 'flex:1' }),
           button(t('Send'), { kind: 'primary', small: true, on: { click: () => sendModal(tpl, load) } }),
+          button(t('⚡ Loud push'), { kind: 'primary', small: true, on: { click: () => zapModal(tpl, load) } }),
           button(t('Edit'), { small: true, on: { click: () => editorModal(tpl, load) } }),
           button(t('Delete'), { small: true, kind: 'danger', on: { click: async () => {
             if (!(await confirmDialog(t('Delete template?'), { danger: true }))) return;
@@ -67,7 +116,10 @@ export async function messagesPage(ctx) {
         h('p', { class: 'hint', style: 'margin:8px 0 0;white-space:pre-wrap' }, tpl.body)
       ));
       box.replaceChildren(
-        h('div', { style: 'margin-bottom:14px' }, button(t('New template'), { kind: 'primary', id: 'btn-new-template', on: { click: () => editorModal(null, load) } })),
+        h('div', { style: 'margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap' },
+          button(t('New template'), { kind: 'primary', id: 'btn-new-template', on: { click: () => editorModal(null, load) } }),
+          button(t('⚡ Loud push'), { id: 'btn-zap-free', on: { click: () => zapModal(null, load) } })
+        ),
         ...cards
       );
     } catch (e) { box.replaceChildren(errorBox(e)); }
@@ -78,6 +130,7 @@ export async function messagesPage(ctx) {
     el: h('div', {},
       h('h1', {}, t('Ready Messages')),
       h('p', { class: 'hint' }, t('Save message templates and send them to captains as an in-app notification with an instant push.')),
+      h('p', { class: 'hint' }, t('⚡ Loud push sends a max-priority ntfy notification to a captain\'s private channel — it rings even when their app is closed. Channels are managed from the ntfy card in Settings.')),
       box
     )
   };

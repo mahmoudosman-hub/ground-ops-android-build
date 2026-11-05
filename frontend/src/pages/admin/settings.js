@@ -1,6 +1,6 @@
 import { h, mount } from '../../core/dom.js';
 import { t } from '../../core/i18n.js';
-import { buildForm, toast, toastError, spinner, errorBox, button, confirmDialog } from '../../components/ui.js';
+import { buildForm, toast, toastError, spinner, errorBox, button, confirmDialog, openModal } from '../../components/ui.js';
 
 export async function settingsPage(ctx) {
   const can = ctx.user.permissions.includes('manage_settings'), box = h('div', {}, spinner());
@@ -175,6 +175,12 @@ export async function settingsPage(ctx) {
         h('option', { value: 'max' }, t('Max (urgent)')),
         h('option', { value: 'default' }, t('Normal'))
       );
+
+      // ── d87: إدارة قنوات الكباتن (S32) ──
+      const channelsBtn = button(t('👥 Manage captain channels'), {
+        small: true,
+        on: { click: captainChannelsModal }
+      });
       const sendBtn = button(t('Send'), {
         kind: 'primary', small: true,
         on: {
@@ -208,7 +214,10 @@ export async function settingsPage(ctx) {
         h('div', { style: 'display:grid;gap:8px;max-width:520px' },
           mTitle, mBody,
           h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, mPri, sendBtn)
-        )
+        ),
+        h('h3', { style: 'margin-top:14px' }, t('Captain channels (per-person loud push)')),
+        h('p', { class: 'hint' }, t('Generate a private ntfy channel for each captain, then share their channel name with them once. They subscribe in their ntfy app and receive your loud pushes directly.')),
+        channelsBtn
       );
     } catch (e) {
       ntfyCard.replaceChildren(
@@ -217,6 +226,80 @@ export async function settingsPage(ctx) {
         errorBox(e)
       );
     }
+  }
+
+  // ── d87: مودال إدارة قنوات الكباتن (سيرفر S32) ──
+  async function captainChannelsModal() {
+    const m = openModal({ title: t('👥 Manage captain channels'), body: null });
+    const body = h('div', {}, spinner());
+    m.setBody(body);
+
+    async function reloadRows() {
+      body.replaceChildren(spinner());
+      let ul;
+      try { ul = await ctx.api.call('ntfyUserList', {}); }
+      catch (e) {
+        body.replaceChildren(
+          h('p', { class: 'hint' }, t('ntfy captain channels unavailable (server patch S32 not installed yet).')),
+          errorBox(e)
+        );
+        return;
+      }
+      const users = ul.users || [];
+      const withTopic = users.filter((u) => u.has_topic).length;
+      const rows = users.map((u) => {
+        const topicSpan = u.has_topic
+          ? h('code', { dir: 'ltr', style: 'font-size:.85rem;background:var(--bg);padding:2px 6px;border-radius:6px;border:1px solid var(--line)' }, u.topic)
+          : h('span', { class: 'hint' }, t('No channel'));
+        const copyBtn = u.has_topic ? button(t('Copy'), { small: true, on: { click: async () => {
+          try { await navigator.clipboard.writeText(u.topic); toast(t('Copied'), 'ok'); } catch (e) { toastError(e); }
+        } } }) : null;
+        const genBtn = button(u.has_topic ? t('Regenerate') : t('Generate'), { small: true, on: { click: async () => {
+          if (u.has_topic && !(await confirmDialog(t('Replace this channel with a new one? The captain must subscribe again.'), { danger: true }))) return;
+          try {
+            const r = await ctx.api.call('ntfyUserSet', { employee_id: u.employee_id });
+            toast(t('Channel generated and saved') + ': ' + r.topic, 'ok'); reloadRows();
+          } catch (e) { toastError(e); }
+        } } });
+        const delBtn = u.has_topic ? button(t('Remove'), { small: true, kind: 'danger', on: { click: async () => {
+          if (!(await confirmDialog(t('Remove channel?'), { danger: true }))) return;
+          try {
+            await ctx.api.call('ntfyUserSet', { employee_id: u.employee_id, remove: true });
+            toast(t('Channel removed'), 'ok'); reloadRows();
+          } catch (e) { toastError(e); }
+        } } }) : null;
+        const testBtn = u.has_topic ? button(t('Test push'), { small: true, on: { click: async () => {
+          try {
+            const r = await ctx.api.call('ntfyUserSend', { employee_id: u.employee_id, title: t('Test push'), message: t('Test loud push for this captain'), priority: 'max' });
+            toast(t('Loud push sent: {a} ok / {b} failed', { a: r.sent, b: r.failed }), r.failed ? 'warn' : 'ok');
+          } catch (e) { toastError(e); }
+        } } }) : null;
+        return h('div', { style: 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line)' },
+          h('strong', { style: 'min-width:180px' }, `${u.employee_id} ${u.employee_name}`),
+          h('span', { style: 'flex:1' }), topicSpan, copyBtn, genBtn, testBtn, delBtn
+        );
+      });
+      const bulkBtn = button(t('⚡ Generate for all captains without a channel'), {
+        small: true,
+        on: { click: async () => {
+          const need = users.filter((u) => !u.has_topic);
+          if (!need.length) { toast(t('All captains already have channels'), 'ok'); return; }
+          if (!(await confirmDialog(t('Generate private channels for {n} captains?', { n: need.length })))) return;
+          let done = 0;
+          for (const u of need) {
+            try { await ctx.api.call('ntfyUserSet', { employee_id: u.employee_id }); done++; } catch (e) { /* نكمل الباقي */ }
+          }
+          toast(t('Channels generated: {n}', { n: done }), 'ok'); reloadRows();
+        } } });
+      body.replaceChildren(
+        h('p', { class: 'hint' }, t('{n} of {m} captains have a channel', { n: withTopic, m: users.length })),
+        h('p', { class: 'hint' }, t('The channel name is the protection — share it with the captain only, and only through a private message.')),
+        h('div', { style: 'margin-bottom:10px' }, bulkBtn),
+        ...(rows.length ? rows : [h('p', { class: 'hint' }, t('Nothing to show.'))])
+      );
+    }
+
+    reloadRows();
   }
 
   // ── KPI Configuration card (تصميم جديد - بطاقات) ─────────────────

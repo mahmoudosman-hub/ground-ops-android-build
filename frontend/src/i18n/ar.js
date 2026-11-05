@@ -641,7 +641,34 @@ const AR = {
   'No pushes sent yet.': 'لسه مفيش إشعارات اتبعتت.',
   'The topic name is the protection — anyone who knows it can send to your channel. Use a long name that is hard to guess.': 'اسم القناة هو الحماية — أي حد يعرفه يقدر يبعت على قناتك. استخدم اسم طويل صعب التخمين.',
   'iPhone steps: install the free ntfy app, add a subscription with the topic above, then press Test push while the screen is locked.': 'خطوات الآيفون: ثبّت تطبيق ntfy المجاني، اعمل اشتراك جديد باسم القناة اللي فوق، وبعدين دوس «إرسال تجريبي» وإنت مقفل الشاشة.',
-  'ntfy status unavailable (server patch not installed yet).': 'حالة ntfy مش متاحة (باتش السيرفر لسه منزلش).'
+  'ntfy status unavailable (server patch not installed yet).': 'حالة ntfy مش متاحة (باتش السيرفر لسه منزلش).',
+  // ---------- زقّة قوية لكل موظف (d87 — سيرفر S32) ----------
+  '⚡ Loud push': '⚡ زقّة قوية',
+  '⚡ Loud push sends a max-priority ntfy notification to a captain\'s private channel — it rings even when their app is closed. Channels are managed from the ntfy card in Settings.': '⚡ «زقّة قوية» بتبعت إشعار ntfy بأولوية قصوى على قناة الكابتن الخاصة — بترن حتى لو التطبيق مقفول. القنوات بتتدار من كارت ntfy في الإعدادات.',
+  'All captains with a channel': 'كل الكباتن اللي عندهم قنوات',
+  'Priority': 'الأولوية',
+  'Send this as a loud ntfy push (max priority)?': 'تبعت ده كزقّة قوية عبر ntfy (أولوية قصوى)؟',
+  'Loud push sent: {a} ok / {b} failed': 'الزقّة اتبعتت: {a} نجح / {b} فشل',
+  'No captain has a channel yet. Generate channels from the ntfy card in Settings.': 'مفيش كابتن عنده قناة لسه. ولّد القنوات من كارت ntfy في الإعدادات.',
+  'Captain channels (per-person loud push)': 'قنوات الكباتن (زقّة قوية لكل شخص)',
+  'Generate a private ntfy channel for each captain, then share their channel name with them once. They subscribe in their ntfy app and receive your loud pushes directly.': 'ولّد قناة ntfy خاصة لكل كابتن، وابعتله اسم قناته مرة واحدة بس. يعمل اشتراك في تطبيق ntfy عنده وهيوصله الزقّة القوية بتاعتك على طول.',
+  '👥 Manage captain channels': '👥 إدارة قنوات الكباتن',
+  'ntfy captain channels unavailable (server patch S32 not installed yet).': 'قنوات الكباتن مش متاحة (باتش السيرفر S32 لسه منزلش).',
+  'No channel': 'مفيش قناة',
+  'Generate': 'توليد',
+  'Regenerate': 'توليد جديد',
+  'Replace this channel with a new one? The captain must subscribe again.': 'تستبدل القناة دي بواحدة جديدة؟ الكابتن لازم يعمل اشتراك من جديد.',
+  'Channel generated and saved': 'القناة اتولدت واتحفظت',
+  'Remove': 'إزالة',
+  'Remove channel?': 'تشيل القناة؟',
+  'Channel removed': 'القناة اتشالت',
+  '⚡ Generate for all captains without a channel': '⚡ توليد لكل الكباتن اللي من غير قناة',
+  'All captains already have channels': 'كل الكباتن عندهم قنوات خلاص',
+  'Generate private channels for {n} captains?': 'توليد قنوات خاصة لـ {n} كابتن؟',
+  'Channels generated: {n}': 'اتولدت قنوات: {n}',
+  '{n} of {m} captains have a channel': '{n} من {m} كباتن عندهم قناة',
+  'The channel name is the protection — share it with the captain only, and only through a private message.': 'اسم القناة هو الحماية — ابعتله للكابتن بس، وفي رسالة خاصة فقط.',
+  'Test loud push for this captain': 'إرسال تجريبي قوي للكابتن ده'
 };
 
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً
