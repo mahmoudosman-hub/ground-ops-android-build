@@ -27,7 +27,8 @@ export function openCheckIn({ api, provider, schedule, onDone }) {
   const branch = schedule.assignment.branch, radius = branch.geofence_radius_meters, s = schedule.settings || {};
   const needSelfie = s.selfie_required !== false, maxBytes = s.selfie_max_bytes || 600000, maxAcc = s.gps_accuracy_threshold_meters || 50;
   // d84: بوابة لينك المتابعة للآيفون (ios_track_link_required من إعدادات السيرفر)
-  const needTrack = !!(s.ios_track_link_required === true || s.ios_track_link_required === 'TRUE');
+  // d89: البوابة على أجهزة الآيفون بس — الأندرويد والويب بيسجلوا حضور عادي من غير خطوة اللينك
+  const needTrack = !!(s.ios_track_link_required === true || s.ios_track_link_required === 'TRUE') && isIosDevice();
   let trackLink = '';
   let stream = null, fix = null, photo = null, modal;
   const cleanup = () => { stopCamera(stream); stream = null; };

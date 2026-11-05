@@ -17,6 +17,8 @@ import { createLangToggle } from '../../services/lang-toggle.js'; // d72: زرا
 // d55 — iOS Google Maps Live Share card
 // الكابتن يلصق رابط Live Share → يتحفظ على السيرفر
 // الأدمن يدوس Watch → يفتح الرابط في تاب جديد ويشوف الكابتن live
+// d88 — لما بوابة لينك المتابعة شغالة (ios_track_link_required) الكارت بيتخفي تلقائي قبل تسجيل الحضور
+// (syncIosCard في home.js) عشان الكابتن ميدخلش اللينك مرتين — ويرجع يظهر بعد الحضور لتحديث اللينك لو مدته خلصت
 // =====================================================================
 
 function createIosLocationCard(api) {
@@ -135,6 +137,7 @@ export function mountEmployeeApp(root, deps = {}) {
     function show(k) { Object.keys(boxes).forEach((n) => { boxes[n].hidden = n !== k; }); tabs.forEach((b, i) => { const on = ['home', 'schedule', 'requests'][i] === k; b.classList.toggle('active', on); b.setAttribute('aria-current', on ? 'page' : 'false'); }); if (k === 'schedule') sched.refresh(); if (k === 'requests') reqs.refresh(); else if (k === 'home' && home) home.refresh(); }
 
     // d55: iOS card — بيظهر بس على iPhone
+    // d88: بيتخفي تلقائي قبل تسجيل الحضور لما بوابة لينك المتابعة شغالة — syncIosCard في home.js بتظبطه مع كل refresh
     const iosCard = isIos() ? createIosLocationCard(api) : null;
 
     mount(body,

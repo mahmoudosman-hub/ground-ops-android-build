@@ -21,13 +21,26 @@ export function createHome({ api, provider, queue }) {
 
   const seenHelp = () => { try { return !!globalThis.localStorage.getItem('gops.nativeHelp.' + userId); } catch (e) { return true; } };
   const markHelp = () => { try { globalThis.localStorage.setItem('gops.nativeHelp.' + userId, '1'); } catch (e) { /* ignore */ } };
+  // d88: لما بوابة لينك المتابعة للآيفون شغالة (ios_track_link_required)، كارت «شارك موقعك» القديم (d55) بيتخفي قبل تسجيل الحضور —
+  // اللينك بيتاخد مرة واحدة جوا خطوات تسجيل الحضور نفسها (موقع ← لينك ← سيلفي) بدل ما الكابتن يدخله مرتين ويتلخبط،
+  // والكارت يرجع يظهر بعد تسجيل الحضور كأداة تحديث للينك لو مدة المشاركة خلصت.
+  function syncIosCard() {
+    try {
+      const card = globalThis.document.getElementById('ios-location-card');
+      if (!card) return;
+      const st = (schedule && schedule.settings) || {};
+      const gateOn = !!(st.ios_track_link_required === true || st.ios_track_link_required === 'TRUE');
+      const notCheckedIn = !schedule || !schedule.attendance || schedule.attendance.state === 'NOT_CHECKED_IN';
+      card.style.display = (gateOn && notCheckedIn) ? 'none' : '';
+    } catch (e) { /* ignore */ }
+  }
   function readCache() { try { return JSON.parse(globalThis.localStorage.getItem(CACHE(userId))); } catch (e) { return null; } }
   async function refresh() {
     try { schedule = await api.call('getTodaySchedule', {}); fromCache = false; loadError = null; try { globalThis.localStorage.setItem(CACHE(userId), JSON.stringify({ at: Date.now(), data: schedule })); } catch (e) { /* ignore */ } }
     catch (e) {
       if (['OFFLINE', 'NETWORK_ERROR', 'SERVER_UNAVAILABLE'].includes(e.code)) { const c = readCache(); if (c) { schedule = c.data; fromCache = c.at; loadError = null; } else loadError = e; } else loadError = e;
     }
-    syncTracker(); render();
+    syncIosCard(); syncTracker(); render();
     if (provider.capabilities.batterySettings && schedule && schedule.attendance && schedule.attendance.state === 'NOT_CHECKED_IN' && !seenHelp()) { markHelp(); openTrackingHelp({ provider }); }
   }
   function syncTracker() {

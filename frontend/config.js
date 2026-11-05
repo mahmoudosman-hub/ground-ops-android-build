@@ -5,7 +5,7 @@
  */
 window.GOPS_CONFIG = Object.freeze({
   APP_NAME: 'Ground OPS Tracker',
-  API_URL: 'https://script.google.com/macros/s/AKfycbzMsUasyw3Rdgyyo8u_6zO0P0pDXuGj7dMAbM0SV3iCVVlK5DXOm0ytGbTy0WMWIlxx/exec', // Apps Script Web App URL (ends with /exec)
+  API_URL: 'https://script.google.com/macros/s/AKfycbySC6sQTg586OX9JTwO2FaLQEdVhkY_c1iWnkadadx9TLE2-tQl1x8Ccu1F48j0JVWj/exec', // Apps Script Web App URL (ends with /exec)
   DEFAULT_TIMEZONE: 'Africa/Cairo',
   DEFAULT_GEOFENCE_RADIUS: 300,      // meters
   DEFAULT_LOCATION_INTERVAL: 5,      // minutes

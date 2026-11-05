@@ -103,7 +103,12 @@ import { t } from '../core/i18n.js'; // d75
     const p = params();
     if (p.get('action') !== 'location_check') return;
     clearParam();
-    const go = () => setTimeout(sendNow, 400);
+    // d90: عشوائية التأخير (jitter) — لما السيرفر يبعت نبضة موقع لمجموعة كباتن في نفس اللحظة،
+    // الكل كان بيفتح التطبيق ويبعت submitLocation في نفس الثانية (19 طلب في ثانيتين 13:51)
+    // فالطلبات بتتزنوق ورا قفل السيرفر الواحد وبتظهر "Running/Failed" واللوجين يقول Slow connection.
+    // الحل: كل جهاز بيستنى تأخير عشوائي 3-35 ثانية قبل الإرسال — نفس السلوك للكابتن، بس الحمل بيتوزع.
+    const JITTER_MS = 3000 + Math.floor(Math.random() * 32000);
+    const go = () => setTimeout(sendNow, JITTER_MS);
     if (document.readyState === 'complete' || document.readyState === 'interactive') go();
     else window.addEventListener('DOMContentLoaded', go, { once: true });
   }

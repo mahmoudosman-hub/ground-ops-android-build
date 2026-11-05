@@ -1,4 +1,4 @@
-/* Ground OPS Tracker service worker - FAST LOAD (build d56) */
+/* Ground OPS Tracker service worker - FAST LOAD (build d91 — precache unified-d91: retry محدود + رابط نشر جديد) */
 importScripts('./precache-manifest.js');
 const CACHE = `gops-${self.GOPS_PRECACHE.version}`;
 const SHELL = self.GOPS_PRECACHE.files;
