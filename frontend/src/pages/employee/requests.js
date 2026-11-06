@@ -8,7 +8,7 @@ import { captureToJpeg, fileToImage } from '../../services/camera.js';
 
 export const MAX_PDF_BYTES = 1000000;
 const coded = (code, msg) => Object.assign(new Error(msg), { code });
-const TYPE_LABEL = { SHIFT_SWAP: 'Shift swap', OFF_SWAP: 'Days-off swap', EARLY_LEAVE: 'Early leave' };
+const TYPE_LABEL = { SHIFT_SWAP: 'Shift swap', OFF_SWAP: 'Days-off swap', EARLY_LEAVE: 'Early leave', LATE_PERMISSION: 'Late permission' }; // d95: كان بينزل الخام LATE_PERMISSION في الجداول
 const LEAVE_LABEL = { ANNUAL: 'Annual leave', CASUAL: 'Casual leave', SICK: 'Sick leave', OTHER: 'Other leave' };
 export const requestTypeLabel = (r) => t(r.type === 'LEAVE' ? (LEAVE_LABEL[r.leave_type] || 'Leave') : (TYPE_LABEL[r.type] || r.type));
 const weekday = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString(getLang() === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'short', timeZone: 'UTC' }); // d79: كانت بلمغة الجهاز — بتظهر Wed في النسخة العربية

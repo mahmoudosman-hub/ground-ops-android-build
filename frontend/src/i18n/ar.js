@@ -327,6 +327,7 @@ const AR = {
   'Pick an hour.': 'اختار الساعة.',
   'Write a reason.': 'اكتب السبب.',
   '⏰ Late permission': '⏰ إذن تأخير',
+  'Late permission': 'إذن تأخير',
   'Ask the admin for permission to arrive later than your shift start.': 'اطلب من الأدمن إذن إنك توصل بعد معاد بداية الشيفت.',
   'I will arrive at': 'هوصل الساعة',
   'Time: {t}': 'الوقت: {t}',

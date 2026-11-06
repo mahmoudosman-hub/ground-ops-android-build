@@ -5,7 +5,7 @@
  */
 window.GOPS_CONFIG = Object.freeze({
   APP_NAME: 'Ground OPS Tracker',
-  APP_VER: 'd94', // d94: طلب الانصراف المبكر بعد منتصف الليل — السماح بيوم أمس + تحديد تلقائي لليوم الشيفت الشغال وعرض نهايته الفعلية + d93: failover + d92: retry للوجين + شيب الإصدار
+  APP_VER: 'd95', // d95: LATE_PERMISSION في فلتر النوع بالأدمن + اسمه مترجم في الجداول (إذن تأخير) + d94: طلب الانصراف المبكر بعد منتصف الليل + d93: failover + d92: retry للوجين + شيب الإصدار
   API_URL: 'https://script.google.com/macros/s/AKfycbySC6sQTg586OX9JTwO2FaLQEdVhkY_c1iWnkadadx9TLE2-tQl1x8Ccu1F48j0JVWj/exec',
   API_URLS: ['https://script.google.com/macros/s/AKfycbySC6sQTg586OX9JTwO2FaLQEdVhkY_c1iWnkadadx9TLE2-tQl1x8Ccu1F48j0JVWj/exec', 'https://script.google.com/macros/s/AKfycbzMsUasyw3Rdgyyo8u_6zO0P0pDXuGj7dMAbM0SV3iCVVlK5DXOm0ytGbTy0WMWIlxx/exec'], // d93: الأساسي + البديل — الاتنين نفس كود v134، لو واحد اتعلّم عليه من شبكة التاني بيتجرب تلقائيًا // Apps Script Web App URL (ends with /exec)
   DEFAULT_TIMEZONE: 'Africa/Cairo',

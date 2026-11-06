@@ -7,7 +7,7 @@ import { clean } from './lookups.js';
 import { requestTypeLabel } from '../employee/requests.js';
 
 const STATUS = [['', 'All'], ['PENDING_ADMIN', 'Waiting for the admin'], ['PENDING_PARTNER', 'Waiting for the other captain'], ['APPROVED', 'Approved'], ['REJECTED', 'Rejected'], ['REJECTED_BY_PARTNER', 'Declined by the other captain'], ['CANCELLED', 'Cancelled'], ['EXPIRED', 'Expired'], ['DRAFT', 'Draft']];
-const TYPES = [['', 'All types'], ['SHIFT_SWAP', 'Shift swap'], ['OFF_SWAP', 'Days-off swap'], ['LEAVE', 'Leave'], ['EARLY_LEAVE', 'Early leave']];
+const TYPES = [['', 'All types'], ['SHIFT_SWAP', 'Shift swap'], ['OFF_SWAP', 'Days-off swap'], ['LEAVE', 'Leave'], ['EARLY_LEAVE', 'Early leave'], ['LATE_PERMISSION', 'Late permission']]; // d95: LATE_PERMISSION كان ناقص من الفلتر (النوع جه مع ميزة إذن التأخير S25/delivery18 والسيرفر بيقبله أصلاً في getRequests)
 
 export async function showProof(ctx, file) {
   const m = openModal({ title: file.name || t('Proof file'), body: spinner(), wide: true });
