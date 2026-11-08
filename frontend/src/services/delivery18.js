@@ -2,6 +2,9 @@
  * Ground OPS - Delivery 18 v4
  * Late permission - creates PENDING_ADMIN directly, no submitRequest step.
  * d75: كل نصوص المودال من i18n (t()) — كان كله إنجليزي هاردكود بيظهر في النسخة العربية.
+ * d96: زرار «⏰ إذن تأخير» كان بيختفي خالص في النسخة العربية — injectButton بيدور على زرار Early leave
+ *       بالنص الحرفي عشان يحط زرار إذن التأخير جنبه، وترجمة ar.js «الانصراف المبكر» (بأل التعريف)
+ *       مش كانت في قايمة المطابقة فمبيلاقيش مرساة في العربي (في الإنجليزي 'early leave' بتطابق فبيظهر عادي).
  */
 import { t } from '../core/i18n.js'; // d75
 (function () {
@@ -204,7 +207,7 @@ import { t } from '../core/i18n.js'; // d75
     var earlyBtn = null;
     for (var i = 0; i < btns.length; i++) {
       var lbl = (btns[i].textContent || '').trim().toLowerCase();
-      if (lbl === 'early leave' || lbl === 'إذن انصراف مبكر' || lbl === 'انصراف مبكر' || lbl === 'early-leave') { earlyBtn = btns[i]; break; }
+      if (lbl === 'early leave' || lbl === 'الانصراف المبكر' || lbl === 'إذن انصراف مبكر' || lbl === 'انصراف مبكر' || lbl === 'early-leave') { earlyBtn = btns[i]; break; } // d96: «الانصراف المبكر» = ترجمة ar.js لزرار Early leave — من غيرها الزرار مبيتحقنش أبدًا في العربي
     }
     if (!earlyBtn) return;
     var parent = earlyBtn.parentNode;
