@@ -703,6 +703,17 @@ AR['Details by captain'] = 'التفاصيل لكل كابتن — يوم بيو
 AR['Records'] = 'عدد السجلات';
 AR['Total'] = 'الإجمالي';
 
+// d98 — تحذير Traccar Client على شاشة الدخول + نافذة التذكير بعد الدخول (آيفون فقط)
+AR['⚠️ IMPORTANT for iPhone — before you sign in'] = '⚠️ مهم جدًا للآيفون — قبل ما تسجّل الدخول';
+AR['You MUST open the Traccar Client app FIRST and make sure it is running and uploading your location (Upload response 200) — then sign in, and keep the app open in the background for your whole shift. If Traccar Client is off, your location tracking will NOT be recorded and you will not appear on the map.'] = 'لازم تفتح تطبيق Traccar Client الأول وتتأكد إنه شغال وبيرفع الموقع (Upload response 200) قبل ما تدوس «تسجيل الدخول» — وتسيبه شغال في الخلفية طول الشيفت. لو التطبيق مش شغال، تتبع موقعك مش هيتسجل ومش هتظهر للإدارة على الخريطة.';
+AR['⚠️ Is Traccar Client running?'] = '⚠️ هل Traccar Client شغال؟';
+AR['Before you start your shift:'] = 'قبل ما تبدأ الشيفت:';
+AR['1. Open the Traccar Client app'] = '١. افتح تطبيق Traccar Client';
+AR['2. Make sure it shows Upload response 200 — it is uploading your location'] = '٢. تأكد إنه بيرفع الموقع بنجاح (Upload response 200)';
+AR['3. Keep it open in the background for the whole shift — if it is off, tracking stops'] = '٣. خليه فاتح في الخلفية طول الشيفت — لو مقفول التتبع بيقف';
+AR['If it is off, your location will not be recorded and you will not appear on the map.'] = 'لو التطبيق مقفول، موقعك مش هيتسجل ومش هتظهر للإدارة على الخريطة.';
+AR['Yes, it is running'] = 'شغال — تمام';
+
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً
 try {
   const legacy = (globalThis.GOPS_ADMIN_I18N && globalThis.GOPS_ADMIN_I18N.ui) || {};

@@ -404,3 +404,11 @@ small { color: var(--muted); font-size: .85rem; }
 .chev { display: inline-block; transition: transform .15s ease; color: var(--brand); font-weight: 700; }
 .rep-group[data-open="1"] .chev { transform: rotate(90deg); }
 .rep-group-body { border-top: 1px solid var(--line); padding: 8px; }
+
+/* ═══ d98 — تحذير Traccar Client على شاشة الدخول (آيفون فقط) ═══ */
+.traccar-warn { background: var(--warn-bg); color: var(--warn); border: 2px solid #E8B44A; border-radius: 10px; padding: 12px 14px; margin: 0 0 14px; text-align: start; animation: traccarPulse 2.4s ease-in-out infinite; }
+.traccar-warn-title { font-weight: 700; font-size: .95rem; margin: 0 0 6px; }
+.traccar-warn-body { font-size: .85rem; line-height: 1.75; margin: 0; }
+.traccar-warn-steps-head { font-weight: 600; margin: 0 0 8px; }
+.traccar-warn-step { margin: 0 0 4px; }
+@keyframes traccarPulse { 0%, 100% { border-color: #E8B44A; } 50% { border-color: var(--bad); } }

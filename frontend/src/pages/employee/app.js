@@ -3,7 +3,7 @@ import { cfg } from '../../core/config.js';
 import { t, initLang } from '../../core/i18n.js';
 import { createApi } from '../../core/api.js';
 import { errorMessage } from '../../core/errors.js';
-import { buildForm, button, badge, toast, toastError } from '../../components/ui.js';
+import { buildForm, button, badge, toast, toastError, openModal } from '../../components/ui.js'; // d98: openModal لتذكير Traccar Client بعد الدخول
 import { selectProvider } from '../../services/location/index.js';
 import { createQueue } from '../../services/offline-queue.js';
 import { onInstallChange, canInstall, promptInstall, isStandalone, isIos } from '../../services/pwa.js';
@@ -82,6 +82,30 @@ function createIosLocationCard(api) {
   );
 }
 
+// =====================================================================
+// d98 — تحذير Traccar Client (آيفون فقط):
+// ① بانر تحذيري ثابت على شاشة الدخول — يظهر كل ماتفتح شاشة الدخول (كل تسجيل دخول)
+// ② نافذة تذكير بعد نجاح تسجيل الدخول — لحظة «بيعمل دخول» بالظبط
+// الهدف: الكابتن مينساش إنه يشتغل تطبيق Traccar Client ويسيبه شغال في الخلفية طول الشيفت
+// (لان التطبيق مقفول = مفيش بينجات = الكابتن مش هيظهر للإدارة على الخريطة)
+// =====================================================================
+function createIosTraccarWarning() {
+  return h('div', { class: 'traccar-warn', id: 'traccar-login-warn', role: 'alert' },
+    h('p', { class: 'traccar-warn-title' }, t('⚠️ IMPORTANT for iPhone — before you sign in')),
+    h('p', { class: 'traccar-warn-body' }, t('You MUST open the Traccar Client app FIRST and make sure it is running and uploading your location (Upload response 200) — then sign in, and keep the app open in the background for your whole shift. If Traccar Client is off, your location tracking will NOT be recorded and you will not appear on the map.')));
+}
+function showTraccarReminderOnce() {
+  if (!isIos()) return;
+  let m;
+  m = openModal({ title: t('⚠️ Is Traccar Client running?'), body: [
+    h('p', { class: 'traccar-warn-steps-head' }, t('Before you start your shift:')),
+    h('p', { class: 'traccar-warn-step' }, t('1. Open the Traccar Client app')),
+    h('p', { class: 'traccar-warn-step' }, t('2. Make sure it shows Upload response 200 — it is uploading your location')),
+    h('p', { class: 'traccar-warn-step' }, t('3. Keep it open in the background for the whole shift — if it is off, tracking stops')),
+    h('p', { class: 'hint' }, t('If it is off, your location will not be recorded and you will not appear on the map.'))
+  ], actions: [button(t('Yes, it is running'), { kind: 'primary', on: { click: () => m.close() } })] });
+}
+
 export function mountEmployeeApp(root, deps = {}) {
   initLang();
   const api = deps.api || createApi('employee'), provider = deps.provider || selectProvider(), queue = deps.queue || createQueue();
@@ -113,13 +137,13 @@ export function mountEmployeeApp(root, deps = {}) {
     const f = buildForm([{ name: 'employee_id', label: 'Employee ID', required: true, autocomplete: 'username', inputmode: 'text' }, { name: 'password', label: 'Password', type: 'password', required: true, autocomplete: 'current-password', trim: false },
       { name: 'remember', label: 'Remember me on this device', type: 'checkbox' }], {}, { submitLabel: t('Sign in'), onSubmit: async (v) => {
       // d92: تشخيص فشل الشبكة + d93: تصنيف أدق (نت شغال؟ جوجل مقطوعة؟ في رابط بديل شغال؟) + محاولة أخيرة تلقائية على الرابط الشغال
-      try { await api.login(v.employee_id, v.password, v.remember); notice = null; view(); }
+      try { await api.login(v.employee_id, v.password, v.remember); notice = null; view(); showTraccarReminderOnce(); }
       catch (e) {
         if (['NETWORK_ERROR', 'OFFLINE', 'SERVER_UNAVAILABLE'].indexOf(e.code) >= 0) {
           const p = await api.probeNetwork();
           if (p && p.anyOk) {
             // لقينا رابط شغال واتثبت — محاولة أخيرة بالرابط الجديد
-            try { await api.login(v.employee_id, v.password, v.remember); notice = null; view(); return; }
+            try { await api.login(v.employee_id, v.password, v.remember); notice = null; view(); showTraccarReminderOnce(); return; }
             catch (e2) { throw Object.assign(new Error(t('The server is working — we switched to a working connection. Try again in a moment.')), { code: 'LOGIN_NET_DIAG' }); }
           }
           if (p && p.netOk) throw Object.assign(new Error(t('Internet works, but the mobile network cannot reach Google servers right now. Turn mobile data OFF and ON (or airplane mode), then try again.')), { code: 'LOGIN_NET_DIAG' });
@@ -128,7 +152,7 @@ export function mountEmployeeApp(root, deps = {}) {
         throw e;
       }
     } });
-    mount(body, h('section', { class: 'card login' }, h('h1', {}, t('Sign in')), notice ? h('div', { class: 'alert alert-warn', id: 'login-notice' }, notice) : null, f.el,
+    mount(body, h('section', { class: 'card login' }, h('h1', {}, t('Sign in')), isIos() ? createIosTraccarWarning() : null, notice ? h('div', { class: 'alert alert-warn', id: 'login-notice' }, notice) : null, f.el,
       h('p', { class: 'hint' }, t('Your Employee ID and password are provided by your administrator.')),
       h('p', { class: 'hint', id: 'login-ver', style: 'margin-top:8px;font-size:11px;opacity:.7' }, (t('App version') || 'App version') + ': ' + (cfg().APP_VER || '?'))));
   }
