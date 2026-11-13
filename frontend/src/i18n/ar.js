@@ -689,6 +689,20 @@ AR['The server is working — we switched to a working connection. Try again in 
 AR['Internet works, but the mobile network cannot reach Google servers right now. Turn mobile data OFF and ON (or airplane mode), then try again.'] = 'النت شغال بس شركة المحمول مش واصلة لسيرفرات جوجل دلوقتي. اقفل بيانات النت وافتحها تاني (أو فعّل وضع الطيران) وحاول — ده بيحل المشكلة فورًا.';
 AR['No internet on this phone right now. Reconnect and try again.'] = 'مفيش نت على الموبايل خالص دلوقتي. وصّل النت (أو بدّل واي فاي / بيانات) وحاول تاني.';
 
+// d97 — تجميع الريبورت لكل كابتن + تنزيل بنفس الشكل المجمّع (كل أنواع الريبورت اللي ليها كباتن)
+AR['Report layout'] = 'شكل العرض';
+AR['Grouped by captain'] = 'مجمّع حسب الكابتن';
+AR['Flat list'] = 'تفصيلي';
+AR['Tap a captain to show or hide their day-by-day details.'] = 'دوس على أي كابتن تظهر أو تخفي تفاصيله يوم بيوم.';
+AR['Expand all'] = 'فتح الكل';
+AR['Collapse all'] = 'طي الكل';
+AR['Download grouped (CSV)'] = 'تنزيل مجمّع (CSV)';
+AR['Grouped export ready: {c} captains, {n} rows'] = 'الملف المجمّع جاهز: {c} كابتن، {n} سجل';
+AR['Summary per captain'] = 'ملخص لكل كابتن';
+AR['Details by captain'] = 'التفاصيل لكل كابتن — يوم بيوم';
+AR['Records'] = 'عدد السجلات';
+AR['Total'] = 'الإجمالي';
+
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً
 try {
   const legacy = (globalThis.GOPS_ADMIN_I18N && globalThis.GOPS_ADMIN_I18N.ui) || {};

@@ -381,3 +381,26 @@ small { color: var(--muted); font-size: .85rem; }
 .app-header .ver { font-size: .68rem; font-weight: 600; opacity: .85; background: rgba(255,255,255,.18); border-radius: 999px; padding: 2px 8px; flex: none; } /* d59: رقم النسخة */
 .btn-danger { background: var(--card); color: var(--bad); border-color: var(--bad); }
 .btn-danger:hover:not(:disabled) { background: var(--bad-bg); }
+
+/* ============================================================
+   d97 — تجميع الريبورت لكل كابتن (مجمّع/تفصيلي + مجموعات قابلة للتوسيع)
+   ============================================================ */
+.rep-mode-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 2px 0 10px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--card); }
+.seg .btn { border: 0; border-radius: 0; background: transparent; color: var(--muted); }
+.seg .btn[aria-pressed="true"] { background: var(--brand); color: var(--brand-text); font-weight: 600; }
+.rep-groups-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
+.rep-group { border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); margin: 10px 0; overflow: hidden; }
+.rep-group-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: 100%; border: 0; background: transparent; color: var(--text); font: inherit; text-align: start; padding: 10px 12px; cursor: pointer; }
+.rep-group-head:hover { background: var(--mute-bg); }
+.rep-group-head b { font-size: 1rem; }
+.rep-group-sub { color: var(--muted); font-size: .85rem; word-break: break-word; }
+.rep-group-stats { display: inline-flex; gap: 6px; flex-wrap: wrap; margin-inline-start: auto; }
+.rep-stat { background: var(--mute-bg); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: .8rem; color: var(--muted); white-space: nowrap; }
+.rep-stat.bad { background: var(--bad-bg); color: var(--bad); border-color: transparent; }
+.rep-stat.warn { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+.rep-stat-main { border-color: var(--brand); color: var(--text); }
+.rep-stat-n { color: var(--text); font-weight: 600; }
+.chev { display: inline-block; transition: transform .15s ease; color: var(--brand); font-weight: 700; }
+.rep-group[data-open="1"] .chev { transform: rotate(90deg); }
+.rep-group-body { border-top: 1px solid var(--line); padding: 8px; }
