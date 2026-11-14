@@ -5,7 +5,7 @@
  */
 window.GOPS_CONFIG = Object.freeze({
   APP_NAME: 'Ground OPS Tracker',
-  APP_VER: 'd98', // d98: تحذير Traccar Client للآيفون — بانر ثابت على شاشة الدخول + نافذة تذكير بعد نجاح الدخول + d97: ريبورتات مجمّعة لكل كابتن (سطر لكل كابتن بإحصاءاته + دوس يفتح تفاصيله يوم بيوم + تنزيل CSV مجمّع بنفس الشكل لكل أنواع الريبورت) + d96: زرار «⏰ إذن تأخير» بقى بيظهر في النسخة العربية (أنكر delivery18 فهم «الانصراف المبكر») + d95: LATE_PERMISSION في فلتر النوع بالأدمن + اسمه مترجم في الجداول (إذن تأخير) + d94: طلب الانصراف المبكر بعد منتصف الليل + d93: failover + d92: retry للوجين + شيب الإصدار
+  APP_VER: 'd99', // d99: بوابة Traccar Client قبل تسجيل الدخول (آيفون فقط) — نص مبسط بدون Upload response 200 + صورتين حقيقيتين لزرار «تتبع مستمر» (Continuous tracking) + زرار تأكيد: فورم الدخول مخفي لحد ما الكابتن يؤكد إنه شغّل التطبيق وبعدها يدخل عادي + إلغاء لينك جوجل ماب نهائيًا (كارت الشاشة الرئيسية + خطوة اللينك في تسجيل الحضور) — التتبع الرسمي Traccar Client فقط + d97: ريبورتات مجمّعة لكل كابتن + d96/d95/d94/d93/d92 سابقة
   API_URL: 'https://script.google.com/macros/s/AKfycbySC6sQTg586OX9JTwO2FaLQEdVhkY_c1iWnkadadx9TLE2-tQl1x8Ccu1F48j0JVWj/exec',
   API_URLS: ['https://script.google.com/macros/s/AKfycbySC6sQTg586OX9JTwO2FaLQEdVhkY_c1iWnkadadx9TLE2-tQl1x8Ccu1F48j0JVWj/exec', 'https://script.google.com/macros/s/AKfycbzMsUasyw3Rdgyyo8u_6zO0P0pDXuGj7dMAbM0SV3iCVVlK5DXOm0ytGbTy0WMWIlxx/exec'], // d93: الأساسي + البديل — الاتنين نفس كود v134، لو واحد اتعلّم عليه من شبكة التاني بيتجرب تلقائيًا // Apps Script Web App URL (ends with /exec)
   DEFAULT_TIMEZONE: 'Africa/Cairo',

@@ -3,7 +3,7 @@ import { cfg } from '../../core/config.js';
 import { t, initLang } from '../../core/i18n.js';
 import { createApi } from '../../core/api.js';
 import { errorMessage } from '../../core/errors.js';
-import { buildForm, button, badge, toast, toastError, openModal } from '../../components/ui.js'; // d98: openModal لتذكير Traccar Client بعد الدخول
+import { buildForm, button, badge, toast, toastError } from '../../components/ui.js';
 import { selectProvider } from '../../services/location/index.js';
 import { createQueue } from '../../services/offline-queue.js';
 import { onInstallChange, canInstall, promptInstall, isStandalone, isIos } from '../../services/pwa.js';
@@ -14,96 +14,37 @@ import { initTheme } from '../../services/theme.js'; // d70: زرار الوضع
 import { createLangToggle } from '../../services/lang-toggle.js'; // d72: زرار تبديل اللغة عربي/English
 
 // =====================================================================
-// d55 — iOS Google Maps Live Share card
-// الكابتن يلصق رابط Live Share → يتحفظ على السيرفر
-// الأدمن يدوس Watch → يفتح الرابط في تاب جديد ويشوف الكابتن live
-// d88 — لما بوابة لينك المتابعة شغالة (ios_track_link_required) الكارت بيتخفي تلقائي قبل تسجيل الحضور
-// (syncIosCard في home.js) عشان الكابتن ميدخلش اللينك مرتين — ويرجع يظهر بعد الحضور لتحديث اللينك لو مدته خلصت
+// d99 — بوابة Traccar Client على شاشة الدخول (آيفون فقط) — بديل بانر d98:
+// ① نص مبسط بدون «Upload response 200» (الكابتن مش هيفهمها) + خطوات + صورتين حقيقيتين
+//    من تطبيق Traccar Client (عربي/English) بتوضح زرار «تتبع مستمر» (Continuous tracking) لازم يكون مفعّل
+// ② زرار تأكيد أخضر — فورم الدخول مخفي خالص لحد ما الكابتن يدوس التأكيد،
+//    وبعد التأكيد يسجل دخول عادي بلا أي نافذة تقطع الدخول (نافذة تذكير d98 اتشالت — مكانها البوابة دي)
+// ③ كارت لينك جوجل ماب (d55) اتشال نهائيًا + خطوة اللينك من تسجيل الحضور (d84) —
+//    التتبع الرسمي بقى Traccar Client بس (قرار المالك 2026-11-14)
 // =====================================================================
-
-function createIosLocationCard(api) {
-  const input = h('input', {
-    type: 'url',
-    id: 'ios-gmaps-input',
-    placeholder: t('Paste your Google Maps link here...'),
-    style: 'width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:14px;box-sizing:border-box'
-  });
-
-  const statusEl = h('p', {
-    id: 'ios-gmaps-status',
-    style: 'font-size:12px;color:#666;margin:6px 0 0;min-height:18px;text-align:start'
-  });
-
-  const sendBtn = button(t('📍 Share my location'), {
-    kind: 'primary',
-    small: true,
-    id: 'btn-ios-send',
-    on: {
-      click: async () => {
-        const url = (input.value || '').trim();
-        if (!url) {
-          mount(statusEl, h('span', { style: 'color:#c00' }, t('⚠️ Paste the link first')));
-          return;
-        }
-        // تحقق بسيط إن الرابط من Google Maps
-        if (!/google\.com\/maps|maps\.app\.goo\.gl/.test(url)) {
-          mount(statusEl, h('span', { style: 'color:#c00' }, t('❌ Invalid link — it must be a Google Maps link')));
-          return;
-        }
-        sendBtn.disabled = true;
-        mount(statusEl, h('span', { style: 'color:#888' }, t('⏳ Saving...')));
-        try {
-          await api.call('saveGmapsLink', { gmaps_link: url });
-          mount(statusEl, h('span', { style: 'color:#0a0' }, t('✅ Done — the admin can now track you live')));
-          // ماسحش الـ input عشان الكابتن يقدر يشوف اللي بعته
-        } catch (e) {
-          mount(statusEl, h('span', { style: 'color:#c00' }, '❌ ' + (e.message || t('Something went wrong, try again'))));
-        }
-        sendBtn.disabled = false;
-      }
-    }
-  });
-
-  return h('div', {
-    id: 'ios-location-card',
-    style: 'background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:14px;margin:12px 0'
-  },
-    h('p', { style: 'font-weight:600;margin:0 0 4px;text-align:start;color:#5d4037' },
-      t('📍 Share your location with the admin (iPhone)')
-    ),
-    h('p', { style: 'font-size:12px;color:#666;margin:0 0 10px;text-align:start;line-height:1.6' },
-      t('1. Open Google Maps'), h('br'),
-      t('2. Tap your profile picture → Location sharing → choose a duration (e.g. 8 hours)'), h('br'),
-      t('3. Tap "Copy link" and paste it here')
-    ),
-    input,
-    h('div', { style: 'margin-top:8px;display:flex;gap:8px;justify-content:flex-end' }, sendBtn),
-    statusEl
-  );
-}
-
-// =====================================================================
-// d98 — تحذير Traccar Client (آيفون فقط):
-// ① بانر تحذيري ثابت على شاشة الدخول — يظهر كل ماتفتح شاشة الدخول (كل تسجيل دخول)
-// ② نافذة تذكير بعد نجاح تسجيل الدخول — لحظة «بيعمل دخول» بالظبط
-// الهدف: الكابتن مينساش إنه يشتغل تطبيق Traccar Client ويسيبه شغال في الخلفية طول الشيفت
-// (لان التطبيق مقفول = مفيش بينجات = الكابتن مش هيظهر للإدارة على الخريطة)
-// =====================================================================
-function createIosTraccarWarning() {
-  return h('div', { class: 'traccar-warn', id: 'traccar-login-warn', role: 'alert' },
+function createIosTraccarGate(unlock) {
+  const okBadge = h('p', { class: 'traccar-ok', id: 'traccar-gate-ok', 'aria-live': 'polite', hidden: true }, '✔ ' + t('Confirmed — you can sign in below'));
+  const confirmRow = h('div', { class: 'traccar-confirm-row' },
+    button(t('Done — Traccar Client is running'), { kind: 'primary', big: true, id: 'btn-traccar-confirm', on: { click: () => {
+      try { globalThis.localStorage.setItem('gops.traccarConfirmAt', String(Date.now())); } catch (e) { /* ignore */ }
+      confirmRow.hidden = true; okBadge.hidden = false; box.classList.add('traccar-confirmed'); unlock();
+    } } }),
+    h('p', { class: 'traccar-gate-hint' }, t('Sign-in stays locked until you tap the button above')));
+  const box = h('div', { class: 'traccar-warn', id: 'traccar-login-warn', role: 'alert' },
     h('p', { class: 'traccar-warn-title' }, t('⚠️ IMPORTANT for iPhone — before you sign in')),
-    h('p', { class: 'traccar-warn-body' }, t('You MUST open the Traccar Client app FIRST and make sure it is running and uploading your location (Upload response 200) — then sign in, and keep the app open in the background for your whole shift. If Traccar Client is off, your location tracking will NOT be recorded and you will not appear on the map.')));
-}
-function showTraccarReminderOnce() {
-  if (!isIos()) return;
-  let m;
-  m = openModal({ title: t('⚠️ Is Traccar Client running?'), body: [
-    h('p', { class: 'traccar-warn-steps-head' }, t('Before you start your shift:')),
+    h('p', { class: 'traccar-warn-body' }, t('You MUST open the Traccar Client app FIRST and turn ON "Continuous tracking" (like the two pictures below), keep it running in the background for your whole shift, then sign in. If Traccar Client is off, your location tracking will NOT be recorded and you will not appear on the map.')),
+    h('p', { class: 'traccar-warn-steps-head' }, t('Steps:')),
     h('p', { class: 'traccar-warn-step' }, t('1. Open the Traccar Client app')),
-    h('p', { class: 'traccar-warn-step' }, t('2. Make sure it shows Upload response 200 — it is uploading your location')),
-    h('p', { class: 'traccar-warn-step' }, t('3. Keep it open in the background for the whole shift — if it is off, tracking stops')),
-    h('p', { class: 'hint' }, t('If it is off, your location will not be recorded and you will not appear on the map.'))
-  ], actions: [button(t('Yes, it is running'), { kind: 'primary', on: { click: () => m.close() } })] });
+    h('p', { class: 'traccar-warn-step' }, t('2. Turn ON "Continuous tracking" — exactly like the two pictures above')),
+    h('p', { class: 'traccar-warn-step' }, t('3. Come back here and sign in — keep the app open in the background the whole shift')),
+    h('figure', { class: 'traccar-shot' },
+      h('img', { src: './assets/traccar/continuous-tracking-ar.jpg', alt: t('Continuous tracking switch ON in the app (Arabic)') }),
+      h('figcaption', {}, t('In the app (Arabic): the "تتبع مستمر" switch must be ON like this'))),
+    h('figure', { class: 'traccar-shot' },
+      h('img', { src: './assets/traccar/continuous-tracking-en.jpg', alt: t('Continuous tracking switch ON in the app (English)') }),
+      h('figcaption', {}, t('In the app (English): "Continuous tracking" must be ON like this'))),
+    okBadge, confirmRow);
+  return box;
 }
 
 export function mountEmployeeApp(root, deps = {}) {
@@ -137,13 +78,14 @@ export function mountEmployeeApp(root, deps = {}) {
     const f = buildForm([{ name: 'employee_id', label: 'Employee ID', required: true, autocomplete: 'username', inputmode: 'text' }, { name: 'password', label: 'Password', type: 'password', required: true, autocomplete: 'current-password', trim: false },
       { name: 'remember', label: 'Remember me on this device', type: 'checkbox' }], {}, { submitLabel: t('Sign in'), onSubmit: async (v) => {
       // d92: تشخيص فشل الشبكة + d93: تصنيف أدق (نت شغال؟ جوجل مقطوعة؟ في رابط بديل شغال؟) + محاولة أخيرة تلقائية على الرابط الشغال
-      try { await api.login(v.employee_id, v.password, v.remember); notice = null; view(); showTraccarReminderOnce(); }
+      // d99: نافذة التذكير بعد الدخول اتشالت — مكانها بوابة التأكيد قبل الدخول
+      try { await api.login(v.employee_id, v.password, v.remember); notice = null; view(); }
       catch (e) {
         if (['NETWORK_ERROR', 'OFFLINE', 'SERVER_UNAVAILABLE'].indexOf(e.code) >= 0) {
           const p = await api.probeNetwork();
           if (p && p.anyOk) {
             // لقينا رابط شغال واتثبت — محاولة أخيرة بالرابط الجديد
-            try { await api.login(v.employee_id, v.password, v.remember); notice = null; view(); showTraccarReminderOnce(); return; }
+            try { await api.login(v.employee_id, v.password, v.remember); notice = null; view(); return; }
             catch (e2) { throw Object.assign(new Error(t('The server is working — we switched to a working connection. Try again in a moment.')), { code: 'LOGIN_NET_DIAG' }); }
           }
           if (p && p.netOk) throw Object.assign(new Error(t('Internet works, but the mobile network cannot reach Google servers right now. Turn mobile data OFF and ON (or airplane mode), then try again.')), { code: 'LOGIN_NET_DIAG' });
@@ -152,7 +94,11 @@ export function mountEmployeeApp(root, deps = {}) {
         throw e;
       }
     } });
-    mount(body, h('section', { class: 'card login' }, h('h1', {}, t('Sign in')), isIos() ? createIosTraccarWarning() : null, notice ? h('div', { class: 'alert alert-warn', id: 'login-notice' }, notice) : null, f.el,
+    // d99: على الآيفون فورم الدخول مخفي لحد ما الكابتن يدوس زرار التأكيد في البوابة فوق — بعد التأكيد يسجل دخول عادي
+    const formWrap = h('div', { id: 'login-form-wrap' }, f.el);
+    const gate = isIos() ? createIosTraccarGate(() => { formWrap.hidden = false; }) : null;
+    if (gate) formWrap.hidden = true;
+    mount(body, h('section', { class: 'card login' }, h('h1', {}, t('Sign in')), gate, notice ? h('div', { class: 'alert alert-warn', id: 'login-notice' }, notice) : null, formWrap,
       h('p', { class: 'hint' }, t('Your Employee ID and password are provided by your administrator.')),
       h('p', { class: 'hint', id: 'login-ver', style: 'margin-top:8px;font-size:11px;opacity:.7' }, (t('App version') || 'App version') + ': ' + (cfg().APP_VER || '?'))));
   }
@@ -177,13 +123,9 @@ export function mountEmployeeApp(root, deps = {}) {
     refreshBtn.title = t('Refresh');
     function show(k) { Object.keys(boxes).forEach((n) => { boxes[n].hidden = n !== k; }); tabs.forEach((b, i) => { const on = ['home', 'schedule', 'requests'][i] === k; b.classList.toggle('active', on); b.setAttribute('aria-current', on ? 'page' : 'false'); }); if (k === 'schedule') sched.refresh(); if (k === 'requests') reqs.refresh(); else if (k === 'home' && home) home.refresh(); }
 
-    // d55: iOS card — بيظهر بس على iPhone
-    // d88: بيتخفي تلقائي قبل تسجيل الحضور لما بوابة لينك المتابعة شغالة — syncIosCard في home.js بتظبطه مع كل refresh
-    const iosCard = isIos() ? createIosLocationCard(api) : null;
-
+    // d99: كارت لينك جوجل ماب (d55) اتشال نهائيًا — التتبع الرسمي بقى Traccar Client بس
     mount(body,
       h('nav', { class: 'tabs', id: 'tabs', 'aria-label': t('Sections') }, ...tabs, refreshBtn),
-      iosCard,
       boxes.home, boxes.schedule, boxes.requests
     );
     show('home');

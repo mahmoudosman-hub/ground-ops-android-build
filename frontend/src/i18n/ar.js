@@ -703,16 +703,22 @@ AR['Details by captain'] = 'التفاصيل لكل كابتن — يوم بيو
 AR['Records'] = 'عدد السجلات';
 AR['Total'] = 'الإجمالي';
 
-// d98 — تحذير Traccar Client على شاشة الدخول + نافذة التذكير بعد الدخول (آيفون فقط)
+// d99 — بوابة Traccar Client على شاشة الدخول (آيفون فقط): نص مبسط بدون «Upload response 200»
+// + خطوات + صورتين حقيقيتين من التطبيق لزرار «تتبع مستمر» + زرار تأكيد يقفل فورم الدخول لحد ما يدوسه
+// — نافذة التذكير بعد الدخول (d98) اتشالت مكانها البوابة قبل الدخول — وكارت جوجل ماب (d55) وخطوة اللينك في الحضور اتشالوا نهائيًا
 AR['⚠️ IMPORTANT for iPhone — before you sign in'] = '⚠️ مهم جدًا للآيفون — قبل ما تسجّل الدخول';
-AR['You MUST open the Traccar Client app FIRST and make sure it is running and uploading your location (Upload response 200) — then sign in, and keep the app open in the background for your whole shift. If Traccar Client is off, your location tracking will NOT be recorded and you will not appear on the map.'] = 'لازم تفتح تطبيق Traccar Client الأول وتتأكد إنه شغال وبيرفع الموقع (Upload response 200) قبل ما تدوس «تسجيل الدخول» — وتسيبه شغال في الخلفية طول الشيفت. لو التطبيق مش شغال، تتبع موقعك مش هيتسجل ومش هتظهر للإدارة على الخريطة.';
-AR['⚠️ Is Traccar Client running?'] = '⚠️ هل Traccar Client شغال؟';
-AR['Before you start your shift:'] = 'قبل ما تبدأ الشيفت:';
+AR['You MUST open the Traccar Client app FIRST and turn ON "Continuous tracking" (like the two pictures below), keep it running in the background for your whole shift, then sign in. If Traccar Client is off, your location tracking will NOT be recorded and you will not appear on the map.'] = 'لازم تفتح تطبيق Traccar Client الأول وتفعّل خيار «تتبع مستمر» (Continuous tracking) — زي الصورتين اللي تحت — وتسيب التطبيق شغال في الخلفية طول الشيفت، وبعد كده سجّل الدخول عادي. لو التطبيق مش شغال، تتبع موقعك مش هيتسجل ومش هتظهر للإدارة على الخريطة.';
+AR['Steps:'] = 'الخطوات:';
 AR['1. Open the Traccar Client app'] = '١. افتح تطبيق Traccar Client';
-AR['2. Make sure it shows Upload response 200 — it is uploading your location'] = '٢. تأكد إنه بيرفع الموقع بنجاح (Upload response 200)';
-AR['3. Keep it open in the background for the whole shift — if it is off, tracking stops'] = '٣. خليه فاتح في الخلفية طول الشيفت — لو مقفول التتبع بيقف';
-AR['If it is off, your location will not be recorded and you will not appear on the map.'] = 'لو التطبيق مقفول، موقعك مش هيتسجل ومش هتظهر للإدارة على الخريطة.';
-AR['Yes, it is running'] = 'شغال — تمام';
+AR['2. Turn ON "Continuous tracking" — exactly like the two pictures above'] = '٢. فعّل خيار «تتبع مستمر» — زي الصورتين اللي فوق دول بالظبط';
+AR['3. Come back here and sign in — keep the app open in the background the whole shift'] = '٣. ارجع هنا وسجّل الدخول عادي — وسيب التطبيق شغال في الخلفية طول الشيفت';
+AR['In the app (Arabic): the "تتبع مستمر" switch must be ON like this'] = 'في تطبيق Traccar Client (بالعربي): زرار «تتبع مستمر» لازم يكون مفعّل زي الصورة دي';
+AR['In the app (English): "Continuous tracking" must be ON like this'] = 'في تطبيق Traccar Client (بالإنجليزي): زرار «Continuous tracking» لازم يكون مفعّل زي الصورة دي';
+AR['Continuous tracking switch ON in the app (Arabic)'] = 'زرار تتبع مستمر مفعّل في التطبيق (عربي)';
+AR['Continuous tracking switch ON in the app (English)'] = 'زرار تتبع مستمر مفعّل في التطبيق (English)';
+AR['Done — Traccar Client is running'] = 'تمام — التطبيق شغال والتتبع المستمر مفعّل';
+AR['Sign-in stays locked until you tap the button above'] = 'تسجيل الدخول متقفل لحد ما تدوس زرار التأكيد اللي فوق';
+AR['Confirmed — you can sign in below'] = 'تم التأكيد — سجّل الدخول من تحت عادي';
 
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً
 try {

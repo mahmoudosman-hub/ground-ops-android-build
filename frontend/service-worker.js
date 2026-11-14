@@ -1,4 +1,4 @@
-/* Ground OPS Tracker service worker - FAST LOAD (build d98 — precache unified-d98: تحذير Traccar Client للآيفون على شاشة الدخول + نافذة تذكير بعد الدخول + d97 ريبورتات مجمّعة لكل كابتن + تنزيل مجمّع CSV + d96 زرار إذن التأخير ظهر في النسخة العربية (أنكر delivery18) + d95 LATE_PERMISSION في فلتر طلبات الأدمن + ترجمة إذن التأخير + d94 ايرلى ليف بعد منتصف الليل + d93 failover + d92 retry للوجين) */
+/* Ground OPS Tracker service worker - FAST LOAD (build d99 — precache unified-d99: بوابة Traccar Client قبل الدخول (آيفون) — نص مبسط بدون Upload response 200 + صورتين زرار «تتبع مستمر» + زرار تأكيد يفتح الدخول + إلغاء لينك جوجل ماب نهائيًا + d97 ريبورتات مجمّعة لكل كابتن + تنزيل مجمّع CSV) */
 importScripts('./precache-manifest.js');
 const CACHE = `gops-${self.GOPS_PRECACHE.version}`;
 const SHELL = self.GOPS_PRECACHE.files;

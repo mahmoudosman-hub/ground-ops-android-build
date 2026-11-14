@@ -411,4 +411,15 @@ small { color: var(--muted); font-size: .85rem; }
 .traccar-warn-body { font-size: .85rem; line-height: 1.75; margin: 0; }
 .traccar-warn-steps-head { font-weight: 600; margin: 0 0 8px; }
 .traccar-warn-step { margin: 0 0 4px; }
+/* d99 — الصورتين + زرار التأكيد + حالة التأكيد */
+.traccar-shot { margin: 10px 0 0; }
+.traccar-shot img { width: 100%; max-width: 480px; display: block; border: 1px solid rgba(0,0,0,.15); border-radius: 8px; background: #fff; }
+.traccar-shot figcaption { font-size: .74rem; margin-top: 4px; opacity: .85; }
+.traccar-confirm-row { margin-top: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.traccar-confirm-row[hidden] { display: none; } /* d99: hidden لازم يغلب display:flex */
+.traccar-ok[hidden] { display: none; }
+#login-form-wrap[hidden] { display: none; }
+.traccar-gate-hint { font-size: .78rem; margin: 0; opacity: .85; }
+.traccar-ok { color: #0a7a2f; font-weight: 700; font-size: .9rem; margin: 10px 0 0; }
+.traccar-warn.traccar-confirmed { animation: none; border-color: #0a7a2f; }
 @keyframes traccarPulse { 0%, 100% { border-color: #E8B44A; } 50% { border-color: var(--bad); } }
