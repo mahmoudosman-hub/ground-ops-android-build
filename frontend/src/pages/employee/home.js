@@ -21,7 +21,7 @@ export function createHome({ api, provider, queue }) {
 
   const seenHelp = () => { try { return !!globalThis.localStorage.getItem('gops.nativeHelp.' + userId); } catch (e) { return true; } };
   const markHelp = () => { try { globalThis.localStorage.setItem('gops.nativeHelp.' + userId, '1'); } catch (e) { /* ignore */ } };
-  // d99: كارت لينك جوجل ماب اتشال نهائيًا (كمان syncIosCard بتاعه) — التتبع الرسمي بقى Traccar Client بس
+  // d99: كارت لينك جوجل ماب اتشال نهائيًا مع دالة المزامنة بتاعته — التتبع الرسمي بقى Traccar Client بس
   function readCache() { try { return JSON.parse(globalThis.localStorage.getItem(CACHE(userId))); } catch (e) { return null; } }
   async function refresh() {
     try { schedule = await api.call('getTodaySchedule', {}); fromCache = false; loadError = null; try { globalThis.localStorage.setItem(CACHE(userId), JSON.stringify({ at: Date.now(), data: schedule })); } catch (e) { /* ignore */ } }
