@@ -423,3 +423,11 @@ small { color: var(--muted); font-size: .85rem; }
 .traccar-ok { color: #0a7a2f; font-weight: 700; font-size: .9rem; margin: 10px 0 0; }
 .traccar-warn.traccar-confirmed { animation: none; border-color: #0a7a2f; }
 @keyframes traccarPulse { 0%, 100% { border-color: #E8B44A; } 50% { border-color: var(--bad); } }
+
+/* d101 — عداد البريك الحي في المراقبة المباشرة */
+.brk-cell { display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-start; min-width: 150px; }
+.brk-live { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.brk-timer { display: inline-block; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--info); background: var(--info-bg); border: 1px solid #B9D4F0; border-radius: 999px; padding: 1px 10px; }
+.brk-timer.brk-over { color: var(--bad); background: var(--bad-bg); border-color: #F1B5B1; animation: brkPulse 1.6s ease-in-out infinite; }
+.brk-total { font-size: .78rem; color: var(--muted); }
+@keyframes brkPulse { 50% { opacity: .5; } }

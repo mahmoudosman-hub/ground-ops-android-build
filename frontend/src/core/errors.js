@@ -13,7 +13,7 @@ const MAP = {
   NO_ACTIVE_SHIFT: 'There is no active shift.', SERVER_BUSY: 'The server is busy. Try again in a moment.', ALREADY_EXISTS: 'This already exists.', NOT_FOUND: 'Not found.',
   REQUEST_CONFLICT: 'This request is no longer possible because the schedule changed.', REQUEST_TOO_LATE: 'It is too late for this request.', LEAVE_BALANCE_EXCEEDED: 'Not enough annual leave balance.', LEAVE_WEEK_LIMIT: 'Too many leave days in one week.', FILE_REQUIRED: 'Attach at least one proof file.', TOO_MANY_FILES: 'Too many files.', INVALID_FILE: 'This file cannot be used.',
   ALREADY_ON_BREAK: 'You are already on a break.', NOT_ON_BREAK: 'You are not on a break.', BREAK_ALLOWANCE_USED: 'You have used all your break time for this shift.', MOCK_LOCATION_REJECTED: 'A fake location was detected.',
-  BRANCH_IN_USE: 'This branch still has current or future assignments.', ASSIGNMENT_LOCKED: 'This assignment can no longer be changed (attendance exists).', EXPORT_TOO_LARGE: 'Too many rows to export. Narrow the date range or add filters.'
+  BRANCH_IN_USE: 'This branch still has current or future assignments.', ASSIGNMENT_LOCKED: 'This day already has attendance, so the day itself is locked - but you can still change the shift or branch (attendance follows automatically). Cancelling or creating a new assignment for this day is not possible.', EXPORT_TOO_LARGE: 'Too many rows to export. Narrow the date range or add filters.'
 };
 export function errorMessage(e) {
   if (!e) return t('Something went wrong.');

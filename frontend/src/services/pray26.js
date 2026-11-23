@@ -1,6 +1,7 @@
 /**
- * Ground OPS - Delivery 26: زر الصلاة (Pray Break) — d51
- * زر بريك الصلاة للكابتن: 15 دقيقة سكوت تام من كل الإشعارات، بتقفل لوحدها.
+ * Ground OPS - Delivery 26: زر صلاة الجمعة (Friday Prayer) — d51
+ * زر صلاة الجمعة للكابتن: 60 دقيقة سكوت تام من كل الإشعارات، بتقفل لوحدها.
+ * d103: التسمية «بريك الصلاة / Prayer break» بقت «صلاة الجمعة / Friday prayer» + المدة الفعلية من إعدادات السيرفر pray_break_minutes (رفعناها لـ60 دقيقة على السيرفر) — الزر بيقرأ المدة من remaining_seconds اللي السيرفر بيرجعه، والـ60 دقيقة هنا مجرد fallback احتياطي.
  * - يظهر فقط للكابتن المسجل الدخول.
  * - العد بالثواني على الزر، وينتهي تلقائياً من السيرفر.
  * - لو الكابتن عمل Check-Out، الصلاة بتتقفل تلقائياً من السيرفر.
@@ -56,7 +57,7 @@ import { t } from '../core/i18n.js'; // d75
       b = document.createElement('button');
       b.id = 'gops-pray-btn';
       b.type = 'button';
-      b.setAttribute('aria-label', t('Prayer break'));
+      b.setAttribute('aria-label', t('Friday prayer'));
       b.addEventListener('click', onTap);
     }
     b.className = 'btn btn-small';
@@ -66,7 +67,7 @@ import { t } from '../core/i18n.js'; // d75
       'padding:4px 12px', 'white-space:nowrap', '-webkit-tap-highlight-color:transparent',
       'transition:background .2s'
     ].join(';');
-    b.innerHTML = '<span id="gops-pray-ic">🕌</span> <span id="gops-pray-tx">' + t('Prayer break') + '</span>';
+    b.innerHTML = '<span id="gops-pray-ic">🕌</span> <span id="gops-pray-tx">' + t('Friday prayer') + '</span>';
     var req = document.getElementById('btn-tabs-refresh') || document.getElementById('tab-requests'); // d54: بعد زرار ⟳ الجديد لو موجود عشان الترتيب يبقى: الطلبات ← ⟳ ← الصلاة
     if (req && req.parentNode === tabs) req.insertAdjacentElement('afterend', b);
     else tabs.appendChild(b);
@@ -117,7 +118,7 @@ import { t } from '../core/i18n.js'; // d75
       setFace('🤲', prayLabel(), '#8a5a00', true);
       startCountdown();
     } else {
-      setFace('🕌', t('Prayer break'), '#0e7a5f', false);
+      setFace('🕌', t('Friday prayer'), '#0e7a5f', false);
       stopCountdown();
     }
   }
@@ -172,7 +173,7 @@ import { t } from '../core/i18n.js'; // d75
         clearTransient();
         mode = 'idle';
         var r = await api('startPrayBreak', {});
-        remainSec = r.remaining_seconds || (15 * 60);
+        remainSec = r.remaining_seconds || (60 * 60);
         paint(true);
       } else if (mode === 'confirm-end') {
         // ضغطة التانية → يقفل البريك

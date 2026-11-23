@@ -6,8 +6,10 @@ import { createMap, drawBranches, drawPoint, fit } from './map.js';
 import { locationCell, detailLink, AUTO_REFRESH_MS, effectiveLocationState } from './dashboard.js';
 
 /** صفحة "المراقبة المباشرة" الموحدة
- *  d55: Watch Live يفتح Google Maps
- *  d56: زرار أخضر "✅ شغال" يحدّث timestamp الكابتن يدوياً (لـ iOS بس) */
+ *  d101: عمود «عداد البريك» — كابتن في بريك حاليًا = عدّاد حي بيعد بالثواني من بداية البريك (بيبان لك دايماً بقاله كام دقيقة)
+ *  والإجمالي التراكمي للشيفت بيكمل عالتايم المحفوظ من السيرفر لما يقفل البريك ويأخد بريك تاني (مرساة server_time)
+ *  d100: عمود المتابعة القديم باللينك (Watch + ✅ شغال) اتشال نهائيًا — قرار المالك: التتبع الرسمي Traccar Client بس،
+ *  والنبض الحقيقي بيحدّث last_location_at تلقائيًا فمش محتاج تأكيد يدوي للإدمن */
 export async function livePage(ctx) {
   const mapBox = h('div', { id: 'live-map', class: 'map', role: 'img', 'aria-label': t('Map of active employees') }), mapNote = h('p', { class: 'hint', id: 'map-note' });
   let m = null, mapTried = false;
@@ -30,31 +32,31 @@ export async function livePage(ctx) {
     } catch (e) { toastError(e); }
   }
 
-  // d55: Watch Live — يفتح Google Maps لو في رابط
-  async function toggleGmaps(r) {
-    if (r.gmaps_link) {
-      globalThis.open(r.gmaps_link, '_blank', 'noopener,noreferrer');
-      return;
+  // ── d101: عداد البريك الحي ──
+  // مرساة وقت السيرفر (server_time) لآخر تحميل: الإجمالي المحفوظ (break_used_minutes) بيكمل عليه عدّ حي طالما الكابتن لسه في البريك
+  let serverAnchorMs = Date.now();
+  const mmss = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)), hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60; return hh ? `${hh}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}` : `${mm}:${String(ss).padStart(2, '0')}`; };
+  function breakCell(r) {
+    const used = Number(r.break_used_minutes) || 0, onBrk = !!(r.on_break && r.break_started_at);
+    if (!onBrk && used <= 0) return h('span', { class: 'hint' }, '—');
+    const parts = [];
+    if (onBrk) {
+      parts.push(h('span', { class: 'brk-live' }, badge('ON_BREAK'),
+        h('span', { class: 'brk-timer' + (r.break_exceeded ? ' brk-over' : ''), dir: 'ltr', dataset: { brkStart: r.break_started_at } }, mmss(Date.now() - Date.parse(r.break_started_at)))));
+      if (r.break_exceeded) parts.push(badge('BREAK_EXCEEDED'));
     }
-    try {
-      await ctx.api.call('setGmapsSharing', { employee_id: r.employee_id, shared: !r.gmaps_shared });
-      toast(t(r.gmaps_shared ? 'Removed from Google Maps watchlist' : 'Marked as sharing on Google Maps'), 'ok');
-      lpRef.reload();
-    } catch (e) { toastError(e); }
+    parts.push(h('span', { class: 'brk-total', dataset: { brkUsed: String(used), brkOn: onBrk ? '1' : '', brkAnchor: String(serverAnchorMs) } }, t('Total break this shift: {m} min', { m: used })));
+    return h('span', { class: 'brk-cell' }, ...parts);
   }
-
-  // d56: تحديث يدوي — الأدمن متأكد إن الكابتن شغال (شافه في Google Maps)
-  async function refreshIosLocation(r) {
-    if (!(await confirmDialog(
-      t('Confirm that {n} is active? This will reset their "off the grid" timer for 15 minutes.', { n: r.employee_name }),
-      { okLabel: t('✅ Yes, they are active'), danger: false }
-    ))) return;
-    try {
-      await ctx.api.call('adminRefreshIosLocation', { employee_id: r.employee_id });
-      toast(t('Updated — {n} is now shown as active for 15 minutes', { n: r.employee_name }), 'ok');
-      lpRef.reload();
-    } catch (e) { toastError(e); }
-  }
+  // مُعدّ الثواني: عداد الجلسة المفتوحة بيتحدث كل ثانية + الإجمالي بيكمل من التايم المحفوظ (من غيره مفيش عدّ بين التحميلات)
+  const ticker = setInterval(() => {
+    const doc = globalThis.document, now = Date.now(); if (!doc) return;
+    doc.querySelectorAll('.brk-timer[data-brk-start]').forEach((el) => { const st = Date.parse(el.dataset.brkStart); if (!isNaN(st)) el.textContent = mmss(now - st); });
+    doc.querySelectorAll('.brk-total[data-brk-used]').forEach((el) => {
+      const used = Number(el.dataset.brkUsed) || 0, drift = el.dataset.brkOn === '1' ? Math.max(0, now - (Number(el.dataset.brkAnchor) || now)) : 0;
+      el.textContent = t('Total break this shift: {m} min', { m: Math.floor((used * 60000 + drift) / 60000) });
+    });
+  }, 1000);
 
   const lp = lpRef = listPage({
     auto: AUTO_REFRESH_MS,
@@ -66,6 +68,7 @@ export async function livePage(ctx) {
       { key: 'employee_name', label: 'Name', render: (r) => h('span', {}, h('strong', {}, r.employee_name), h('br'), h('small', {}, r.employee_id)) },
       { key: 'branch_name', label: 'Branch' },
       { key: 'attendance_state', label: 'Current status', render: (r) => badge(r.attendance_state) },
+      { key: 'break_timer', label: 'Break timer', render: (r) => breakCell(r) },
       { key: 'last_location_at', label: 'Last GPS update', render: (r) => (r.last_location_at ? `${fmtTime(r.last_location_at)} (${agoText(r.last_location_at)})` : '-') },
       { key: 'last_distance_meters', label: 'Distance from branch', render: (r) => (r.last_distance_meters != null ? `${Math.round(r.last_distance_meters)} m` : '-') },
       { key: 'location_state', label: 'Inside / outside', render: locationCell },
@@ -73,36 +76,6 @@ export async function livePage(ctx) {
       { key: 'shift_name', label: 'Shift' },
       { key: 'pings_unanswered', label: 'Pings without reply', render: (r) => (r.pings_unanswered ? h('strong', { style: 'color:#c62828' }, String(r.pings_unanswered)) : '0') },
       { key: 'last_ping_at', label: 'Last ping', render: (r) => (r.last_ping_at ? agoText(r.last_ping_at) : '-') },
-      {
-        key: 'gmaps_shared',
-        label: 'Google Maps',
-        render: (r) => {
-          // عمود Google Maps: Watch Live + زرار أخضر صغير لو في رابط
-          const watchBtn = r.gmaps_link
-            ? button('🗺️ ' + t('Watch Live'), {
-                small: true,
-                style: 'background:#2e7d32;color:#fff;border-color:#2e7d32',
-                on: { click: () => toggleGmaps(r) }
-              })
-            : button(r.gmaps_shared ? t('Watching') : t('Watch'), {
-                small: true,
-                class: r.gmaps_shared ? 'x' : '',
-                on: { click: () => toggleGmaps(r) }
-              });
-
-          // زرار أخضر صغير "✅ شغال" — بيظهر بس لو في رابط Google Maps (يعني iOS)
-          const confirmBtn = r.gmaps_link
-            ? button('✅ ' + t('Active'), {
-                small: true,
-                style: 'background:#43a047;color:#fff;border-color:#43a047;margin-top:4px;display:block;width:100%',
-                title: t('I confirmed this captain is active via Google Maps. Reset their off-grid timer.'),
-                on: { click: () => refreshIosLocation(r) }
-              })
-            : null;
-
-          return h('span', { style: 'display:flex;flex-direction:column;gap:4px' }, watchBtn, confirmBtn);
-        }
-      },
       {
         key: 'actions',
         label: 'Actions',
@@ -125,6 +98,7 @@ export async function livePage(ctx) {
         ctx.api.call('getCurrentStatuses', { date: todayLocal(), page_size: 500 }),
         ctx.api.call('getLiveMap', {}).catch(() => null)
       ]);
+      serverAnchorMs = (res && res.server_time) ? Date.parse(res.server_time) : Date.now();
       const active = res.items.filter((r) => r.attendance_state === 'CHECKED_IN');
       const pings = {};
       ((lmRes && lmRes.items) || []).forEach((x) => { pings[x.employee_id] = x; });
@@ -132,9 +106,7 @@ export async function livePage(ctx) {
         const p = pings[r.employee_id] || {};
         return Object.assign({}, r, {
           pings_unanswered: p.pings_unanswered || 0,
-          last_ping_at:     p.last_ping_at     || '',
-          gmaps_shared:     !!p.gmaps_shared,
-          gmaps_link:       p.gmaps_link        || ''
+          last_ping_at:     p.last_ping_at     || ''
         });
       });
       drawMap(merged);
@@ -146,11 +118,11 @@ export async function livePage(ctx) {
     el: h('div', {},
       h('h1', {}, t('Live Monitoring')),
       h('p', { class: 'hint' }, t('"On break" means the captain is allowed to have location off. "Tracking unavailable" means no recent GPS data - it does not mean the employee left the branch.')),
+      h('p', { class: 'hint' }, t('Break counter: it counts up live while a captain is on break, and the total keeps the saved minutes when he takes another break.')),
       h('p', { class: 'hint' }, t('Pings: the system automatically pings captains whose location is stale (every 15 minutes). "Pings without reply" shows who did not respond, and "Ping now" sends a ping yourself.')),
       h('p', { class: 'hint' }, t('GPS grace period: for up to 15 minutes after his last GPS update the captain keeps his last known state (green "Inside branch"). Only after a full 15 minutes with no GPS update does he show as "Off the grid".')),
       h('p', { class: 'hint' }, t('Tip: the table scrolls sideways - drag the bar under the table (or hold Shift and roll the mouse wheel) to see the rest of the columns.')),
-      h('p', { class: 'hint', style: 'color:#2e7d32' }, t('🗺️ iPhone captains: Watch Live opens their Google Maps location. ✅ Active confirms they are working and resets their off-grid timer for 15 minutes.')),
       mapBox, mapNote, lp.el),
-    destroy: lp.stop
+    destroy() { lp.stop(); clearInterval(ticker); }
   };
 }

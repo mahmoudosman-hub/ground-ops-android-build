@@ -27,7 +27,10 @@ export async function assignmentsPage(ctx) {
       row ? { employee_id: row.employee_id, shift_id: row.shift_id, branch_id: row.branch_id } : {}, { cancel: () => m.close(), onSubmit: async (v) => {
         const to = v.date_to || v.date_from, dates = datesBetween(v.date_from, to);
         if (to < v.date_from) throw Object.assign(new Error(t('The end date is before the start date.')), { code: 'VALIDATION_ERROR' });
-        await ctx.api.call('assignShift', { employee_id: v.employee_id, work_dates: dates, shift_id: v.shift_id, branch_id: v.branch_id }); m.close(); toast(t('Assigned {n} day(s)', { n: dates.length }), 'ok'); lp.reload(); } });
+        // d102: السيرفر بيسمح دلوقتي بتغيير الشيفت/الفرع حتى بعد الحضور — ويرجع midshift لما الكابتن كان شغال فعلاً
+        const res = await ctx.api.call('assignShift', { employee_id: v.employee_id, work_dates: dates, shift_id: v.shift_id, branch_id: v.branch_id }); m.close();
+        const ms = res && res.midshift && res.midshift.length;
+        toast(ms ? t('Changed during the shift ✅ attendance, live tracking and captain notification updated.') : t('Assigned {n} day(s)', { n: dates.length }), 'ok', ms ? 9000 : 4500); lp.reload(); } });
     if (!row) f.inputs.employee_id.addEventListener('change', () => { const e = l.employees.find((x) => x.employee_id === f.inputs.employee_id.value); if (e) { if (e.default_shift_id) f.set('shift_id', e.default_shift_id); if (e.default_branch_id) f.set('branch_id', e.default_branch_id); } });
     m.setBody(f.el);
   }
@@ -59,5 +62,5 @@ export async function assignmentsPage(ctx) {
     m.setBody(f.el);
   }
   async function cancel(r) { if (!(await confirmDialog(t('Cancel the assignment of {n} on {d}?', { n: en[r.employee_id] || r.employee_id, d: r.work_date }), { danger: true }))) return; try { await ctx.api.call('assignShift', { employee_id: r.employee_id, work_date: r.work_date, status: 'CANCELLED' }); toast(t('Cancelled'), 'ok'); lp.reload(); } catch (e) { toastError(e); } }
-  return { el: h('div', {}, h('h1', {}, t('Daily Assignments')), h('p', { class: 'hint' }, t('Each employee is assigned a shift and branch per date. The geofence for a day always uses that day\'s branch.')), lp.el) };
+  return { el: h('div', {}, h('h1', {}, t('Daily Assignments')), h('p', { class: 'hint' }, t('Each employee is assigned a shift and branch per date. The geofence for a day always uses that day\'s branch.')), h('p', { class: 'hint' }, t('You can change the shift or branch even after check-in - attendance and live tracking follow the new branch automatically, and the captain gets a notification.')), lp.el) };
 }

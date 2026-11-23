@@ -59,11 +59,7 @@ const AR = {
   'Updates every minute. Green = fresh (20 min), orange = getting old (45 min), red = no location.': 'بتتحدث كل دقيقة. أخضر = موقع حديث (20 دقيقة)، برتقالي = بدأ يقصر، أحمر = مفيش موقع.',
   'Live map of captains on duty (iPhone PWA + Android). The system pings captains whose location is stale every 15 minutes; the counter shows pings without a reply.': 'خريطة حية للكباتن الشغالين (آيفون + أندرويد). النظام بيتبع أي كابتن موقعه قديم كل 15 دقيقة، والعدّاد بيوضح مين ما ردش.',
 
-  // ---------- خرائط جوجل ----------
-  'Google Maps': 'خرائط جوجل', 'Watch': 'متابعة', 'Watching': 'بيتم المتابعة',
-  'Removed from Google Maps watchlist': 'اتشالت من قائمة متابعة خرائط جوجل', 'Marked as sharing on Google Maps': 'اتسجل على قائمة متابعة خرائط جوجل',
-  'Watch Live': 'متابعة لايف',
-  '🗺️ iPhone captains: if a captain shared their Google Maps link, the Watch button turns green and opens their live location directly.': '🗺️ كباتن الآيفون: لو كابتن شارك رابط خرائط جوجل بتاعه، زرار المتابعة بيتحول لأخضر وبيفتح موقعه لايف على طول.',
+  // d100: مفاتيح خرائط جوجل (Watch/Watch Live/watchlist) اتشالت نهائيًا مع أعمدة المراقبة — التتبع الرسمي Traccar Client بس
 
   // ---------- الإشعارات (d48) ----------
   'Notifications': 'الإشعارات', 'Notifications ({n} unread)': 'الإشعارات ({n} غير مقروء)',
@@ -96,13 +92,7 @@ const AR = {
   'The server is taking longer than expected. The changes were most likely applied successfully.': 'السيرفر بياخد وقت أطول من المتوقع. التغييرات غالبًا اتنفذت بنجاح.',
   'Reload the page to confirm.': 'حدّث الصفحة للتأكيد.',
   'Taking longer than expected — reload to confirm': 'بياخد وقت أطول من المتوقع — حدّث الصفحة للتأكيد',
-  // d66: ميزة زرار «✅ شغال» (d56) في المراقبة المباشرة
   'Active': 'شغال',
-  'Confirm that {n} is active? This will reset their "off the grid" timer for 15 minutes.': 'تأكيد إن {n} شغال؟ ده هيصفّر مؤقت «خارج الشبكة» بتاعه لمدة ١٥ دقيقة.',
-  '✅ Yes, they are active': '✅ أيوه، شغال',
-  'Updated — {n} is now shown as active for 15 minutes': 'تم — {n} هيظهر شغال لمدة ١٥ دقيقة',
-  'I confirmed this captain is active via Google Maps. Reset their off-grid timer.': 'أنا متأكد إن الكابتن ده شغال من خرائط جوجل. ده هيصفّر مؤقت «خارج الشبكة» بتاعه.',
-  '🗺️ iPhone captains: Watch Live opens their Google Maps location. ✅ Active confirms they are working and resets their off-grid timer for 15 minutes.': '🗺️ كباتن الآيفون: «متابعة لايف» بتفتح موقعهم على خرائط جوجل. و«✅ شغال» بتأكد إن الكابتن بيشتغل وبتصفّر مؤقت «خارج الشبكة» ١٥ دقيقة.',
 
   // ---------- S22: التقارير الجديدة + كارت KPI في الإعدادات ----------
   'Captain Daily Summary': 'ملخص الكابتن اليومي', 'KPI Scores': 'درجات الـ KPI',
@@ -333,19 +323,7 @@ const AR = {
   'Time: {t}': 'الوقت: {t}',
   'Late permission request sent ✅': 'طلب إذن تأخير الحضور اتبعت ✅',
 
-  // كارت مشاركة الموقع للآيفون (employee/app.js)
-  'Paste your Google Maps link here...': 'الصق رابط Google Maps هنا...',
-  '📍 Share my location': '📍 شارك موقعي',
-  '⚠️ Paste the link first': '⚠️ الصق الرابط الأول',
-  '❌ Invalid link — it must be a Google Maps link': '❌ الرابط مش صح — لازم يكون من Google Maps',
-  '⏳ Saving...': '⏳ بيتحفظ...',
-  '✅ Done — the admin can now track you live': '✅ تم — الأدمن دلوقتي يقدر يتابع موقعك لايف',
-  'Something went wrong, try again': 'حصل خطأ، حاول تاني',
-  '📍 Share your location with the admin (iPhone)': '📍 شارك موقعك مع الأدمن (آيفون)',
-  '1. Open Google Maps': '١. افتح Google Maps',
-  '2. Tap your profile picture → Location sharing → choose a duration (e.g. 8 hours)': '٢. دوس على صورتك ← مشاركة الموقع ← اختار مدة (٨ ساعات مثلاً)',
-  '3. Tap "Copy link" and paste it here': '٣. دوس "نسخ الرابط" والصقه هنا',
-
+  // d100: كارت مشاركة الموقع (d55) ومفاتيحه اتشالت نهائيًا — التتبع الرسمي Traccar Client بس
   // رد النبضة (ping-response.js)
   'Sign in first so we can verify your location': 'سجل دخولك الأول عشان نقدر نأكد موقعك',
   'This device does not support location': 'الجهاز ده مش بيدعم تحديد الموقع',
@@ -357,8 +335,8 @@ const AR = {
   'Location was not sent — try again': 'مبعتش الموقع — حاول تاني',
   'No internet — open the app again when the network is back': 'مفيش إنترنت — افتح التطبيق تاني لما الشبكة ترجع',
 
-  // بريك الصلاة (pray26.js)
-  'Prayer break': 'بريك الصلاة',
+  // صلاة الجمعة (pray26.js)
+  'Friday prayer': 'صلاة الجمعة',
   'Stop 🤲 {t}': 'إيقاف 🤲 {t}',
   'Done ✅': 'تم ✅',
   'Sure? Tap again': 'متأكد؟ دوس تاني',
@@ -587,11 +565,7 @@ const AR = {
   // ---------- d83: tooltip إصدار التطبيق ----------
   'App version': 'إصدار التطبيق',
 
-  // ---------- d84: الحزمة الأربعة (S29) ----------
-  '📱 iOS tracking link gate': '📱 بوابة لينك المتابعة للآيفون',
-  'When enabled, iPhone captains must paste a Google Maps live location link before they can check in. The selfie stays required as usual. Android and web are not affected.': 'لما تتشغل، كباتن الآيفون لازم يلصقوا لينك مشاركة الموقع المباشر من خرائط جوجل قبل تسجيل الحضور. السيلفي بتفضل إجبارية زي ما هي. الأندرويد والويب مش متأثرين.',
-  'Required before check-in:': 'إجباري قبل الحضور:',
-  'Tip: enable it after the captains have the updated app, otherwise their check-in will be rejected until they refresh the page.': 'نصيحة: فعّلها بعد ما أجهزة الكباتن تاخد التحديث — لو فعّلتها بدري، طلب الحضور هيرفض لحد ما يحدّثوا الصفحة.',
+  // ---------- d84: الحزمة الأربعة (S29) — مفاتيح بوابة لينك جوجل ماب اتشالت نهائيًا (d100) ----------
   'Reset attendance marks': 'تصفير علامات الحضور',
   'Late arrival': 'التأخير',
   'Early check-out': 'الخروج المبكر',
@@ -620,12 +594,6 @@ const AR = {
   'Send "{t}" as a notification + push?': 'تبعت «{t}» كإشعار داخل التطبيق + إشعار فوري؟',
   'Message sent to {n} captain(s)': 'الرسالة وصلت لـ {n} كابتن',
   'No templates yet. Add your first one.': 'مفيش رسائل محفوظة لسه — ضيف أول رسالة.',
-  'Before checking in: share your live location': 'قبل تسجيل الحضور: شارك موقعك المباشر',
-  'Open Google Maps > tap your profile icon > Location sharing > share your live location, copy the link, and paste it here. The admin will watch it live until your shift ends.': 'افتح خرائط جوجل > دوس على صورة حسابك > مشاركة الموقع > شارك موقعك المباشر، انسخ اللينك والصقه هنا. الإدارة هتشوف موقعك live لحد نهاية الشيفت.',
-  'Continue: tracking link': 'متابعة: لينك المتابعة',
-  'Invalid link': 'اللينك مش صحيح',
-  'Paste the live location sharing link from Google Maps (it starts with maps.app.goo.gl or google.com/maps).': 'الصق لينك مشاركة الموقع المباشر من خرائط جوجل (بيبدأ بـ maps.app.goo.gl أو google.com/maps).',
-  'Tracking link required': 'لينك المتابعة مطلوب',
 
   // ---------- إشعارات الآيفون ntfy (d86) ----------
   '📱 iPhone push (ntfy)': '📱 إشعارات الآيفون (ntfy)',
@@ -719,6 +687,25 @@ AR['Continuous tracking switch ON in the app (English)'] = 'زرار تتبع م
 AR['Done — Traccar Client is running'] = 'تمام — التطبيق شغال والتتبع المستمر مفعّل';
 AR['Sign-in stays locked until you tap the button above'] = 'تسجيل الدخول متقفل لحد ما تدوس زرار التأكيد اللي فوق';
 AR['Confirmed — you can sign in below'] = 'تم التأكيد — سجّل الدخول من تحت عادي';
+
+// d100 — مفاتيح ناقصة قديمة (home/native-help/records/messages) اكتملت مع تنظيف بقايا جوجل ماب
+AR['The tracking service is not running (Android may have stopped it). Your supervisor sees "Tracking unavailable".'] = 'خدمة التتبع مش شغالة (أندرويد ممكن يكون وقفها). المشرف هيشوف «التتبع غير متاح».';
+AR["Today's shift"] = 'شيفت النهارده';
+AR['Battery optimization / "battery saver" on some phones (Xiaomi, Huawei, Oppo, Samsung and others) can pause apps in the background. If tracking stops, open the battery settings below and choose "Unrestricted" or "Don\'t optimize" for this app.'] = 'تحسين البطارية / «موفّر البطارية» في بعض الموبايلات (شاومي، هواوي، أوبو، سامسونج وغيرهم) ممكن يوقف التطبيقات في الخلفية. لو التتبع وقف، افتح إعدادات البطارية اللي تحت واختار «بدون قيود» أو «متخصصّش» لهذا التطبيق.';
+AR['Location "while using the app" (precise): to check you in and track your shift. We do not ask for "all the time" location.'] = 'الموقع «وأنت بتستخدم التطبيق» (دقيق): عشان تسجل الحضور وتتبع الشيفت. مش بنطلب موقع «طول الوقت» خالص.';
+AR['Turning off Location, revoking the permission, or force-stopping the app stops tracking. The dashboard then shows "Tracking unavailable" - not that you left the branch.'] = 'لو قفلت الموقع، أو سحبت الصلاحية، أو قفلت التطبيق بالكامل — التتبع هيوقف والداشبورد هيظهر «التتبع غير متاح» — وده مش معناه إنك سبت الفرع.';
+AR['Employees on leave appear as "On leave", never as absent.'] = 'الموظفين في إجازة بيظهروا «في إجازة» — مش غايبين أبدًا.';
+AR['⚡ Loud push sends a max-priority ntfy notification to a captain\'s private channel — it rings even when their app is closed. Channels are managed from the ntfy card in Settings.'] = '⚡ الزقّة القوية بتبعت إشعار ntfy بأعلى أولوية على قناة الكابتن الخاصة — بيرن حتى لو التطبيق مقفول. القنوات بتتظبط من كارت ntfy في الإعدادات.';
+
+// d101 — عداد البريك الحي في المراقبة المباشرة
+AR['Break timer'] = 'عداد البريك';
+AR['Total break this shift: {m} min'] = 'إجمالي البريك في الشيفت: {m} دقيقة';
+AR['Break counter: it counts up live while a captain is on break, and the total keeps the saved minutes when he takes another break.'] = 'عداد البريك بيعد حيًا طول ما الكابتن في البريك — والإجمالي بيكمل عالتايم المحفوظة لما يقفل ويأخد بريك تاني.';
+
+// d102 — تغيير الفرع/الشيفت أثناء الشيفت (حتى بعد الحضور)
+AR['Changed during the shift ✅ attendance, live tracking and captain notification updated.'] = 'اتغير أثناء الشيفت ✅ — سجل الحضور والتتبع المباشر اتنقلوا للفرع الجديد وتبعت إشعار للكابتن.';
+AR['You can change the shift or branch even after check-in - attendance and live tracking follow the new branch automatically, and the captain gets a notification.'] = 'تقدر تغير الشيفت أو الفرع حتى بعد تسجيل الحضور — سجل الحضور والتتبع المباشر بيتبعوا الفرع الجديد أوتوماتيك، والكابتن بيوصله إشعار.';
+AR['This day already has attendance, so the day itself is locked - but you can still change the shift or branch (attendance follows automatically). Cancelling or creating a new assignment for this day is not possible.'] = 'اليوم ده ليه سجل حضور فاليوم نفسه مقفول — بس تقدر تغير الشيفت أو الفرع عادي (والحضور بيتبع الفرع الجديد أوتوماتيك). الإلغاء أو إنشاء تعيين جديد لليوم ده مش ممكن.';
 
 // دمج قاموس الأدمن القديم (admin-translations.js) — المفاتيح اللي مكتوبة فوق ليها الأولوية دايماً
 try {

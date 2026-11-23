@@ -19,7 +19,7 @@ function metersBetween(lat1, lng1, lat2, lng2) {
 }
 export function effectiveLocationState(r, now) {
   const st = r.location_state || '';
-  if (r.on_break || r.tracking_state === 'PAUSED') return st; // بريك الصلاة أو تتبع متوقف → القاعدة القديمة (مسموح اللوكيشن يقف)
+  if (r.on_break || r.tracking_state === 'PAUSED') return st; // بريك أو صلاة الجمعة أو تتبع متوقف → القاعدة القديمة (مسموح اللوكيشن يقف)
   if (r.attendance_state && r.attendance_state !== 'CHECKED_IN') return st; // مش داخل شيفت → القاعدة القديمة
   if (!r.last_location_at) return st; // مفيش أي لوكيشن خالص
   const last = Date.parse(r.last_location_at);
